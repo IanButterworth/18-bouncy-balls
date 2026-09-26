@@ -4,6 +4,8 @@ You're Steve Reich, you're in a vintage Paris music instrument shop, and you hav
 
 <https://ianbutterworth.github.io/18-bouncy-balls/>
 
+Listen to the original: [Music for 18 Musicians on Spotify](https://open.spotify.com/album/1htaihWHjMXZTupJanFnfC)
+
 ## Details
 
 A 3D bouncy-ball shooting gallery set in a Belle Époque Paris music shop,

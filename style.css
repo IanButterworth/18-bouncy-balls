@@ -137,7 +137,7 @@ body:has(#overlay:not(.hidden)) #c { cursor: default; }
   cursor: pointer;
 }
 
-#repo {
+#repo, #listen {
   position: fixed;
   right: 16px;
   bottom: calc(max(16px, env(safe-area-inset-bottom)) + 54px);
@@ -153,7 +153,8 @@ body:has(#overlay:not(.hidden)) #c { cursor: default; }
   opacity: 0.55;
   transition: opacity 0.2s;
 }
-#repo:hover, #repo:focus-visible { opacity: 1; }
+#listen { bottom: calc(max(16px, env(safe-area-inset-bottom)) + 108px); }
+#repo:hover, #repo:focus-visible, #listen:hover, #listen:focus-visible { opacity: 1; }
 
 #hint {
   position: fixed;
