@@ -315,6 +315,15 @@ export const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
 export const rbox = (w, h, d, r = 0.02) => new RoundedBoxGeometry(w, h, d, 3, r);
 export const cyl = (rt, rb, h, s = 24, open = false) => new THREE.CylinderGeometry(rt, rb, h, s, 1, open);
 
+// A flat board between two points, its width across x and thickness facing out.
+function slab(parent, a, b, width, thick, mat) {
+  const va = new THREE.Vector3(...a), vb = new THREE.Vector3(...b);
+  const m = mesh(box(width, va.distanceTo(vb), thick), mat, parent);
+  m.position.copy(va).add(vb).multiplyScalar(0.5);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), vb.sub(va).normalize());
+  return m;
+}
+
 // A cylinder between two points, for rods, stands and cords.
 export function rod(parent, a, b, r, mat) {
   const va = new THREE.Vector3(...a), vb = new THREE.Vector3(...b);
@@ -433,9 +442,10 @@ export class Shop {
   hit(inst, vel, push) {
     const p = inst.pendulum;
     if (p && push) {
-      // A light ball against a heavy chandelier: only a small share of its speed passes on.
-      p.vz += 0.06 * push.x / p.L;
-      p.vx -= 0.06 * push.z / p.L;
+      // How much of the ball's speed passes on depends on how heavy the thing is.
+      const k = p.push ?? 0.06;
+      p.vz += k * push.x / p.L;
+      p.vx -= k * push.z / p.L;
     }
     inst.flash = Math.min(1.2, inst.flash + 0.4 + 0.8 * vel);
     if (inst.wob < 0.05) inst.phase = 0;
@@ -966,22 +976,34 @@ export function makeStringed(color, { w1 = 0.19, w2 = 0.15, L = 0.5, d = 0.1, ne
     mesh(new THREE.RingGeometry(w2 * 0.38, w2 * 0.46, 32), m.ivory, g, [0, bodyY + L * 0.12, front + 0.001]);
     mesh(box(w1 * 0.6, 0.025, 0.015), m.darkWood, g, [0, bodyY - L * 0.24, front + 0.007]);
   }
-  mesh(box(w2 * 0.36, neck, 0.035), bowed ? m.darkWood : m.lightWood, g, [0, -head - neck / 2, 0]);
-  mesh(box(w2 * 0.34, neck + (bowed ? L * 0.3 : 0.05), 0.008), m.ebony, g, [0, -head - neck / 2 - (bowed ? L * 0.15 : 0), 0.021]);
+  // The neck's playing face lies level with the top of the body, so the strings clear it.
+  const neckZ = front - 0.019, neckFace = neckZ + 0.0175;
+  mesh(box(w2 * 0.36, neck, 0.035), bowed ? m.darkWood : m.lightWood, g, [0, -head - neck / 2, neckZ]);
+  // A violin-family fingerboard runs on over the body, rising to clear its arched top.
+  const boardEnd = bowed ? [0, bodyY + L * 0.2, front + 0.012] : [0, -head - neck - 0.05, neckFace + 0.004];
+  slab(g, [0, -head, neckFace + 0.004], boardEnd, w2 * 0.34, 0.008, m.ebony);
   if (bowed) {
-    mesh(new THREE.TorusGeometry(head * 0.3, head * 0.12, 8, 20), m.darkWood, g, [0, -head * 0.3, 0], [0, PI / 2, 0]);
-    mesh(box(w2 * 0.28, head * 0.7, 0.04), m.darkWood, g, [0, -head * 0.6, 0]);
+    mesh(new THREE.TorusGeometry(head * 0.3, head * 0.12, 8, 20), m.darkWood, g, [0, -head * 0.3, neckZ], [0, PI / 2, 0]);
+    mesh(box(w2 * 0.28, head * 0.7, 0.04), m.darkWood, g, [0, -head * 0.6, neckZ]);
   } else {
-    mesh(rbox(w2 * 0.55, head, 0.025, 0.008), m.ebony, g, [0, -head / 2, 0]);
+    mesh(rbox(w2 * 0.55, head, 0.025, 0.008), m.ebony, g, [0, -head / 2, neckZ]);
     for (let i = 0; i < 3; i++) for (const s of [-1, 1]) {
-      mesh(cyl(0.008, 0.008, 0.03, 8), m.chrome, g, [s * w2 * 0.33, -0.035 - i * 0.045, 0], [0, 0, PI / 2]);
+      mesh(cyl(0.008, 0.008, 0.03, 8), m.chrome, g, [s * w2 * 0.33, -0.035 - i * 0.045, neckZ], [0, 0, PI / 2]);
     }
   }
-  const top = -head + 0.01, bottom = bodyY - L * (bowed ? 0.47 : 0.24);
-  const sw = (strings - 1) * 0.008;
-  for (let s = 0; s < strings; s++) {
-    const sx = -sw / 2 + s * 0.008;
-    mesh(box(0.0015, top - bottom, 0.0015), m.chrome, g, [sx, (top + bottom) / 2, 0.04]).userData.noShadow = true;
+  // Strings run from the tailpiece or bridge pins, over the bridge and along the
+  // fingerboard to the nut, fanning out towards the bridge. Cello and bass strings
+  // are drawn thick enough to read from across the shop.
+  const nut = [-head + 0.01, neckFace + 0.014];
+  const bridge = bowed ? [bodyY - L * 0.05, front + 0.036] : [bodyY - L * 0.24, front + 0.014];
+  const tail = bowed ? [bodyY - L * 0.2, front + 0.022] : null;
+  const r = bowed ? 0.0022 * Math.sqrt(L / 0.36) : 0.0012;
+  const spread = (bowed ? w2 * 0.3 : w2 * 0.28) / Math.max(1, strings - 1);
+  for (let k = 0; k < strings; k++) {
+    const f = k - (strings - 1) / 2;
+    const atBridge = [f * spread, ...bridge], atNut = [f * spread * 0.55, ...nut];
+    rod(g, atBridge, atNut, r, m.chrome).userData.noShadow = true;
+    if (tail) rod(g, [f * spread * 0.7, ...tail], atBridge, r, m.chrome).userData.noShadow = true;
   }
   return { g, bodyY };
 }
@@ -1191,7 +1213,8 @@ function buildChandelier(shop, x, z, y) {
   light.position.set(0, 0.1, 0);
   body.add(light);
   shop.lights.push(light);
-  const inst = shop.instrument(pivot, { voice: 'crystal', jingle: true, wobble: 'none', pendulum: { L: drop, x: 0, z: 0, vx: 0, vz: 0 }, glow: 0xfff2c0 });
+  // Heavy, so a ball passes on only a small share of its speed.
+  const inst = shop.instrument(pivot, { voice: 'crystal', jingle: true, wobble: 'none', pendulum: { L: drop, push: 0.06, x: 0, z: 0, vx: 0, vz: 0 }, glow: 0xfff2c0 });
   shop.cyl(pivot, 0.48, 0.5, [0, -drop, 0], inst);
 }
 

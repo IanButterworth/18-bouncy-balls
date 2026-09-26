@@ -241,7 +241,8 @@ function instrumentCase(shop, pos, rz, size, color) {
   shop.box(g, size, [0, 0, 0], shop.silent());
 }
 
-// Small stringed instruments hung from the beams on cords; they swing when struck.
+// Small stringed instruments hung from the beams on cords. Each swings from where its
+// cord is tied to the beam, as a pendulum, in the direction it was struck.
 function hangingInstruments(shop) {
   const kinds = [
     { dims: { w1: 0.1, w2: 0.08, L: 0.3, d: 0.07, neck: 0.2, head: 0.08, strings: 4 }, color: 0xd9a05b, lo: 60, hi: 81, gliss: 1 },
@@ -251,13 +252,20 @@ function hangingInstruments(shop) {
   const spots = [[-7.6, -1.8], [-6.5, -1.8], [6.5, -1.8], [7.6, -1.8], [-7.4, 0.1], [7.4, 0.1], [-2.6, -3.7], [2.6, -3.7]];
   spots.forEach(([x, z], i) => {
     const k = kinds[i % kinds.length];
-    const hookY = 5.9 - 0.15 * (i % 3);
-    const pivot = group(shop.root, [x, hookY, z], [0, rand(-0.4, 0.4), 0]);
-    rod(pivot, [0, ROOM.H - hookY - 0.3, 0], [0, 0, 0], 0.004, materials().rope);
+    const beam = ROOM.H - 0.34;
+    const cord = beam - (5.9 - 0.15 * (i % 3));
+    const pivot = group(shop.root, [x, beam, z]);
+    const hang = group(pivot, [0, 0, 0], [0, rand(-0.4, 0.4), 0]);
+    rod(hang, [0, 0, 0], [0, -cord, 0], 0.004, materials().rope);
     const { g, bodyY } = makeStringed(k.color, k.dims);
-    pivot.add(g);
-    const inst = shop.instrument(pivot, { voice: 'pluck', lo: k.lo, hi: k.hi, slot: (i % 4) / 3, gliss: k.gliss, wobble: 'swing', amp: 0.5, glow: 0xffc070 });
-    shop.box(pivot, [k.dims.w1 * 2 + 0.04, k.dims.L, k.dims.d + 0.05], [0, bodyY, 0], inst);
+    g.position.y = -cord;
+    hang.add(g);
+    const inst = shop.instrument(pivot, {
+      voice: 'pluck', lo: k.lo, hi: k.hi, slot: (i % 4) / 3, gliss: k.gliss, wobble: 'none', glow: 0xffc070,
+      // Light things on a long cord: a ball knocks them well away.
+      pendulum: { L: cord - bodyY, push: 0.35, x: 0, z: 0, vx: 0, vz: 0 },
+    });
+    shop.box(hang, [k.dims.w1 * 2 + 0.04, k.dims.L, k.dims.d + 0.05], [0, -cord + bodyY, 0], inst);
   });
 }
 

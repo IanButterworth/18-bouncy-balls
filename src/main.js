@@ -318,10 +318,12 @@ function handleCollision({ ball, other, impact, point }) {
   const now = performance.now();
   if (now - inst.last < 45) return;
   inst.last = now;
+  // Which way and how hard the ball struck, for things hung free to swing.
+  const push = point.clone().sub(ball.body.position).normalize().multiplyScalar(impact);
   if (inst.jingle) {
     music.jingle(point.toArray(), vel);
     music.addEnergy(vel);
-    shop.hit(inst, vel, point.clone().sub(ball.body.position).normalize().multiplyScalar(impact));
+    shop.hit(inst, vel, push);
     fx.note(point, 96, vel);
     return;
   }
@@ -331,7 +333,7 @@ function handleCollision({ ball, other, impact, point }) {
   const midi = music.hit(inst.voice, inst.lo, inst.hi, slot, step, vel, point.toArray(), inst.gliss);
   ball.bounces++;
   music.addEnergy(vel);
-  shop.hit(inst, vel);
+  shop.hit(inst, vel, push);
   fx.note(point, midi, vel);
 }
 
