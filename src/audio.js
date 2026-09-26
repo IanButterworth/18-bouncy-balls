@@ -45,7 +45,7 @@ export const LEVEL_NAMES = ['Pulse', 'Pattern', 'Canon', 'Build-up', 'Ensemble',
 // Every voice is something struck, plucked or shaken, since that is all a ball can do.
 const LEVEL = {
   mallet: 0.55, xylo: 0.38, metallophone: 0.36, piano: 0.42, harpsichord: 0.4, shaker: 0.22,
-  pluck: 0.5, harp: 0.45, pizz: 0.7, pop: 0.1, bounce: 0.35,
+  pluck: 0.5, harp: 0.45, pizz: 0.7, pop: 0.1, bounce: 0.35, thud: 0.45, crystal: 0.14,
 };
 // Hammond drawbars: 16', 8', 4', 2 2/3', 2' and 1 1/3', as ratios and levels.
 const DRAWBARS = [[0.5, 0.45], [1, 1], [2, 0.55], [3, 0.3], [4, 0.25], [6, 0.1]];
@@ -91,7 +91,7 @@ export class Music {
     this.pipes = { peak: 0.1, attack: 0.9, release: 1.1, ebb: 6 };
     this.churchAt = [6.6, 1.6, -4.6];
     this.combo = { peak: 0.07, attack: 0.2, release: 0.4, ebb: 6 };
-    this.comboAt = [-8.6, 0.95, -3.0];
+    this.comboAt = [-8.3, 1.05, -2.8];
     this.energy = 0;
     this.muted = false;
   }
@@ -624,6 +624,19 @@ export class Music {
     return true;
   }
 
+  // Crystal pendants knocked together: a quick tumble of tiny glass clinks, more for
+  // a harder knock, pitched high in the chord but loose in time as they settle.
+  jingle(pos, vel) {
+    if (!this.ready()) return;
+    const n = 3 + Math.round(vel * 6);
+    let at = 0;
+    for (let k = 0; k < n; k++) {
+      const loud = vel * (1 - k / (n + 2)) * (0.6 + 0.4 * Math.random());
+      this.play('crystal', this.pick(84, 103, Math.random(), 0), loud, pos, at, false);
+      at += 0.02 + Math.random() * 0.07;
+    }
+  }
+
   // Unpitched sounds of the balls themselves.
   effect(voice, midi, vel, pos, onGrid = false) {
     if (!this.ready() || this.active > 90) return;
@@ -848,6 +861,18 @@ export class Music {
   v_pop(f, t, v, out) {
     this.noise(t, 0.035, out, { type: 'bandpass', freq: 1200, q: 1.5, amp: 1 });
     return this.partials(f, t, [[1, 0.6, 0.06]], out, 0.6, 0.03);
+  }
+
+  // One cut-glass pendant: a bright click and a short ring with glass's uneven overtones.
+  v_crystal(f, t, v, out) {
+    this.noise(t, 0.008, out, { type: 'bandpass', freq: 7000, q: 1.5, amp: 0.5 });
+    return this.partials(f, t, [[1, 1, 0.45], [2.32, 0.4, 0.25], [4.25, 0.2, 0.12]], out);
+  }
+
+  // A ball landing on upholstery: a low, muffled thump with no ring to it.
+  v_thud(f, t, v, out) {
+    this.noise(t, 0.09, out, { type: 'lowpass', freq: 260, amp: 0.8 });
+    return this.partials(f, t, [[1, 1, 0.12]], out, 1.6, 0.05);
   }
 
   // A rubber ball landing on the floor: a small muted bop.

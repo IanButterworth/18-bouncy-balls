@@ -374,6 +374,12 @@ export class Shop {
     return inst;
   }
 
+  // Soft furniture: a ball lands on it with a muffled thud rather than a note.
+  cushion() {
+    this.cushionInst ??= this.instrument(new THREE.Object3D(), { voice: 'thud', thud: true, musical: false, wobble: 'none' });
+    return this.cushionInst;
+  }
+
   // Shared by every surface that is not an instrument: balls bounce off it in silence.
   silent() {
     this.silentInst ??= this.instrument(new THREE.Object3D(), { musical: false, wobble: 'none' });
@@ -423,7 +429,14 @@ export class Shop {
     });
   }
 
-  hit(inst, vel) {
+  // `push` is how hard and which way the ball struck, for things that swing freely.
+  hit(inst, vel, push) {
+    const p = inst.pendulum;
+    if (p && push) {
+      // A light ball against a heavy chandelier: only a small share of its speed passes on.
+      p.vz += 0.06 * push.x / p.L;
+      p.vx -= 0.06 * push.z / p.L;
+    }
     inst.flash = Math.min(1.2, inst.flash + 0.4 + 0.8 * vel);
     if (inst.wob < 0.05) inst.phase = 0;
     inst.wob = Math.min(1, inst.wob + 0.3 + vel);
@@ -435,6 +448,18 @@ export class Shop {
         inst.flash *= Math.exp(-dt * 5);
         if (inst.flash < 0.003) inst.flash = 0;
         for (const m of inst.mats) m.emissive.copy(inst.glow).multiplyScalar(inst.flash * 0.55);
+      }
+      const p = inst.pendulum;
+      if (p) {
+        // A real pendulum from the ceiling: it swings at sqrt(g / L) and slowly settles.
+        const w2 = 9.81 / p.L;
+        p.vx += (-w2 * Math.sin(p.x) - 0.3 * p.vx) * dt;
+        p.vz += (-w2 * Math.sin(p.z) - 0.3 * p.vz) * dt;
+        p.x += p.vx * dt;
+        p.z += p.vz * dt;
+        inst.node.rotation.x = inst.base.rot.x + p.x;
+        inst.node.rotation.z = inst.base.rot.z + p.z;
+        continue;
       }
       if (inst.wob <= 0) continue;
       const { node, base } = inst, w = inst.wob * inst.amp, t = (inst.phase += dt);
@@ -897,7 +922,7 @@ function buildCafeChair(shop, x, z, ry) {
   mesh(new THREE.TorusGeometry(0.19, 0.012, 8, 32), m.walnut, g, [0, 0.2, 0], [PI / 2, 0, 0]);
   mesh(new THREE.TorusGeometry(0.17, 0.016, 8, 24, PI), m.walnut, g, [0, 0.82, -0.18]);
   for (const s of [-1, 1]) rod(g, [s * 0.17, 0.82, -0.18], [s * 0.15, 0.46, -0.19], 0.016, m.walnut);
-  shop.box(g, [0.44, 0.06, 0.44], [0, 0.46, 0], shop.silent());
+  shop.box(g, [0.44, 0.06, 0.44], [0, 0.46, 0], shop.cushion());
   return g;
 }
 
@@ -1128,7 +1153,7 @@ function buildVitrine(shop) {
 
 // --- hanging things ------------------------------------------------------------------------
 
-// Crystal chandeliers.
+// Crystal chandeliers; struck, their pendants jingle and they swing from the ceiling.
 function buildChandelier(shop, x, z, y) {
   const m = materials(), R = shop.root, H = ROOM.H;
   mesh(cyl(0.08, 0.1, 0.06, 16), m.iron, R, [x, H - 0.03, z]);
@@ -1161,11 +1186,13 @@ function buildChandelier(shop, x, z, y) {
   }
   const big = mesh(new THREE.OctahedronGeometry(0.05), m.crystal, body, [0, -0.4, 0]);
   big.scale.y = 1.6;
+  // The light hangs inside it, so light and shadows swing with it.
   const light = new THREE.PointLight(0xffc27a, 3.5, 0, 2);
-  light.position.set(x, y + 0.1, z);
-  R.add(light);
+  light.position.set(0, 0.1, 0);
+  body.add(light);
   shop.lights.push(light);
-  shop.cyl(pivot, 0.48, 0.5, [0, -drop, 0], shop.silent());
+  const inst = shop.instrument(pivot, { voice: 'crystal', jingle: true, wobble: 'none', pendulum: { L: drop, x: 0, z: 0, vx: 0, vz: 0 }, glow: 0xfff2c0 });
+  shop.cyl(pivot, 0.48, 0.5, [0, -drop, 0], inst);
 }
 
 export function buildShop(shop) {
@@ -1186,7 +1213,7 @@ export function buildShop(shop) {
   buildMarimba(shop, -2.9, 2.3, 0.35);
   buildMarimba(shop, 0, 2.7, 0);
   buildMarimba(shop, 2.9, 2.3, -0.35);
-  buildHarpsichord(shop, -3.0, -2.0, 0.3);
+  buildHarpsichord(shop, -1.6, -1.6, 0.19);
   buildPiano(shop, 3.6, -2.2, -0.3);
   buildUpright(shop, 0, 0, -5.0);
   const chair = buildCafeChair(shop, 5.4, 0.4, -0.8);

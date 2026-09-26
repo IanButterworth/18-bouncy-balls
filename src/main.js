@@ -298,6 +298,10 @@ function handleCollision({ ball, other, impact, point }) {
   }
   const inst = other.inst;
   if (!inst || !inst.voice) return;
+  if (inst.thud) {
+    music.effect('thud', 36, vel, point.toArray());
+    return;
+  }
   if (inst.ostinato) lockToPulse(ball.body);
   if (inst.swell) {
     const now = performance.now();
@@ -314,6 +318,13 @@ function handleCollision({ ball, other, impact, point }) {
   const now = performance.now();
   if (now - inst.last < 45) return;
   inst.last = now;
+  if (inst.jingle) {
+    music.jingle(point.toArray(), vel);
+    music.addEnergy(vel);
+    shop.hit(inst, vel, point.clone().sub(ball.body.position).normalize().multiplyScalar(impact));
+    fx.note(point, 96, vel);
+    return;
+  }
   const slot = inst.slotFrom ? inst.slotFrom(point.clone()) : inst.slot;
   const step = inst.arp ? inst.hits % 3 : 0;
   inst.hits++;
@@ -350,6 +361,7 @@ function hitTarget(t, ball, point) {
     for (const b of balls) if (!b.dying) b.age = Math.max(0, b.age - 10);
     cascade = CASCADE;
   }
+  if (playing) targets.grow();
   music.addEnergy(1);
   music.addEnergy(1);
 }
@@ -358,6 +370,7 @@ function start() {
   music.init();
   game.state = 'playing';
   game.score = game.shown = 0;
+  for (const b of balls) b.dying = true;
   targets.reset();
   $('overlay').classList.add('hidden');
   $('hud').classList.remove('hidden');
@@ -520,12 +533,12 @@ function aimPoint(ndc) {
 }
 
 let recoil = 0;
-function fire(ndc, quiet) {
+function fire(ndc) {
   const to = aimPoint(ndc);
   const from = mouth.getWorldPosition(new THREE.Vector3());
   launch(from, to);
   recoil = 1;
-  if (!quiet) music.effect('pop', 70, 0.5, from.toArray());
+  music.effect('pop', 70, 0.5, from.toArray());
 }
 
 // Notes rise from an organ when it plays loud, more and bigger the louder it gets.
@@ -534,7 +547,7 @@ function fire(ndc, quiet) {
 const organNoteSources = [
   { key: 'tonewheel', boost: 0, from: v => shop.leslie.horn.localToWorld(v.set(0.28, 0, 0)) },
   { key: 'pipes', boost: 0, from: v => shop.church.node.localToWorld(v.set(Math.random() * 1.8 - 0.9, 2.5 + Math.random() * 1.2, 0.3)) },
-  { key: 'combo', boost: 5, from: v => shop.combo.node.localToWorld(v.set(Math.random() * 0.8 - 0.4, 1.05, 0)) },
+  { key: 'combo', boost: 5, from: v => shop.combo.node.localToWorld(v.set(Math.random() * 0.8 - 0.4, 1.25, 0)) },
 ];
 
 function organNotes(dt) {
@@ -598,11 +611,12 @@ function frame(now) {
       lastPulse = q;
     }
   } else if (game.state === 'menu') {
-    // Attract mode: lob a few silent balls around the shop.
+    // Attract mode: drop the odd silent ball from the beams onto the bars. The
+    // player's guns stay still until they play.
     demoTimer -= dt;
     if (demoTimer <= 0) {
-      demoTimer = 0.5 + Math.random() * 0.6;
-      fire(new THREE.Vector2(Math.random() * 1.6 - 0.8, Math.random() * 0.9 - 0.4), true);
+      demoTimer = 0.8 + Math.random() * 0.8;
+      dropBall();
     }
   }
 

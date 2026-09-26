@@ -104,32 +104,41 @@ function churchOrgan(shop, x, z, ry) {
   shop.box(g, [2.3, 3.2, 1.0], [0, 1.6, 0], inst);
 }
 
-// A Farfisa-style combo organ, the kind heard in Reich's Four Organs: a red-topped
-// case with rocker tabs on a chrome Z-stand.
+// A Farfisa-style combo organ, the kind heard in Reich's Four Organs: a red-orange
+// lacquered two-tier case with chrome trim and rocker tabs, on a chrome Z-stand, lit
+// by its own small lamp so it stands out against the window.
 function comboOrgan(shop, x, z, ry) {
   const m = materials();
   const g = group(shop.root, [x, 0, z], [0, ry, 0]);
   for (const s of [-1, 1]) {
-    const sx = s * 0.4;
-    rod(g, [sx, 0.02, 0.2], [sx, 0.02, -0.2], 0.015, m.chrome);
-    rod(g, [sx, 0.02, 0.2], [sx, 0.8, -0.15], 0.015, m.chrome);
-    rod(g, [sx, 0.8, -0.15], [sx, 0.8, 0.15], 0.015, m.chrome);
+    const sx = s * 0.45;
+    rod(g, [sx, 0.02, 0.22], [sx, 0.02, -0.22], 0.018, m.chrome);
+    rod(g, [sx, 0.02, 0.22], [sx, 0.86, -0.16], 0.018, m.chrome);
+    rod(g, [sx, 0.86, -0.16], [sx, 0.86, 0.16], 0.018, m.chrome);
   }
-  mesh(rbox(1.0, 0.1, 0.42, 0.02), std(0x6a6c70, 0.6), g, [0, 0.86, 0]);
-  mesh(rbox(1.0, 0.04, 0.2, 0.015), gloss(0xb3202a, 0.3), g, [0, 0.93, -0.1]);
-  keyboard(g, 0.86, 0.93, 0.1, 29);
-  const tabs = [0xf2ece0, 0xf2ece0, 0x141414, 0xd8a030, 0xf2ece0, 0x141414, 0xb3202a, 0xf2ece0];
-  tabs.forEach((c, i) => mesh(rbox(0.035, 0.012, 0.05, 0.004), std(c, 0.4), g, [-0.3 + i * 0.05, 0.955, -0.12]));
-  mesh(box(0.34, 0.01, 0.34), m.walnut, g, [0.1, 0.06, 0.35]);
-  mesh(rbox(0.1, 0.04, 0.2, 0.01), m.ebony, g, [0.1, 0.09, 0.35], [-0.25, 0, 0]);
-  shop.combo = { pos: [x, 0.95, z], node: g };
+  const lacquer = gloss(0xd9481f, 0.25);
+  mesh(rbox(1.1, 0.12, 0.46, 0.03), lacquer, g, [0, 0.93, 0]);
+  mesh(box(1.12, 0.02, 0.48), m.chrome, g, [0, 0.99, 0]);
+  keyboard(g, 0.94, 1.01, 0.12, 31);
+  mesh(rbox(1.1, 0.1, 0.24, 0.02), lacquer, g, [0, 1.08, -0.12]);
+  keyboard(g, 0.94, 1.14, 0.0, 31);
+  const tabs = [0xf2ece0, 0xf2ece0, 0x141414, 0xd8a030, 0xf2ece0, 0x141414, 0x2e86c1, 0xf2ece0, 0xd8a030];
+  tabs.forEach((c, i) => mesh(rbox(0.04, 0.014, 0.05, 0.004), std(c, 0.4), g, [-0.3 + i * 0.075, 1.14, -0.19]));
+  mesh(box(0.6, 0.24, 0.015), m.chrome, g, [0, 1.3, -0.23], [-0.25, 0, 0]);
+  mesh(box(0.34, 0.01, 0.34), m.walnut, g, [0.1, 0.06, 0.38]);
+  mesh(rbox(0.1, 0.04, 0.2, 0.01), m.ebony, g, [0.1, 0.09, 0.38], [-0.25, 0, 0]);
+  const lamp = new THREE.SpotLight(0xffcf95, 14, 0, 0.6, 0.8, 2);
+  lamp.position.set(x, 2.8, z);
+  lamp.target.position.set(x, 1, z);
+  shop.root.add(lamp, lamp.target);
+  shop.combo = { pos: [x, 1.05, z], node: g };
   const inst = shop.instrument(g, { voice: 'combo', swell: 'combo', wobble: 'none', glow: 0xffc070 });
-  shop.box(g, [1.0, 0.16, 0.44], [0, 0.88, 0], inst);
+  shop.box(g, [1.12, 0.3, 0.48], [0, 1.02, -0.02], inst);
 }
 
 export function buildOrgan(shop) {
   churchOrgan(shop, 6.6, -4.6, -0.5);
   organ(shop, -6.0, -5.0, 0.45);
   leslie(shop, -7.6, -5.6, 0.5);
-  comboOrgan(shop, -8.6, -3.0, PI / 2 - 0.35);
+  comboOrgan(shop, -8.3, -2.8, 0.75);
 }

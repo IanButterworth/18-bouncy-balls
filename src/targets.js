@@ -4,13 +4,16 @@ import { ROOM, MEZZ } from './shop.js';
 
 const PI = Math.PI;
 const RADIUS = 0.3;
+// Play starts with a couple of targets; each one hit brings another, up to the maximum.
+const START_TARGETS = 2;
+const MAX_TARGETS = 5;
 
 const SPAWNS = [
   { p: [-3.6, 1.5, 0.2], type: 'post' },
   { p: [3.6, 1.6, 0.2], type: 'post' },
   { p: [-5.4, 2.2, -3.2], type: 'post' },
   { p: [5.0, 2.3, -3.4], type: 'post' },
-  { p: [-1.8, 1.4, -4.4], type: 'post' },
+  { p: [-3.2, 1.4, -4.4], type: 'post' },
   { p: [-8.2, 1.5, 3.2], type: 'post' },
   { p: [8.4, 1.6, -0.6], type: 'post' },
   { p: [-6.9, MEZZ.y + 1.5, -7.1], type: 'post', floor: MEZZ.y },
@@ -20,7 +23,7 @@ const SPAWNS = [
   { p: [-4.8, 4.2, -3.4], type: 'hang' },
   { p: [6.7, 4.4, 0.0], type: 'hang' },
   { p: [-2.2, 3.7, -0.4], type: 'hang' },
-  { p: [0, 1.55, -1.0], type: 'slide', range: 1.8, speed: 0.9 },
+  { p: [0, 1.9, -0.4], type: 'slide', range: 1.6, speed: 0.9 },
   { p: [0, 3.3, -0.5], type: 'slide', range: 3.2, speed: 0.6 },
   { p: [-4.2, 4.6, -5.9], type: 'slide', range: 2.2, speed: 1.1 },
   { p: [4.3, 4.4, -5.8], type: 'slide', range: 1.5, speed: 1.3 },
@@ -66,7 +69,7 @@ export class Targets {
     scene.add(this.root);
     this.list = [];
     this.queue = [];
-    this.count = 5;
+    this.count = START_TARGETS;
     const face = new THREE.MeshStandardMaterial({ map: bullseyeTex(), roughness: 0.45 });
     this.mats = {
       face,
@@ -78,11 +81,20 @@ export class Targets {
     this.discGeo = new THREE.CylinderGeometry(RADIUS, RADIUS, 0.06, 48);
   }
 
-  reset() {
+  // Starts with only a few targets up.
+  reset(count = START_TARGETS) {
+    this.count = count;
     for (const t of this.list) this.remove(t);
     this.list = [];
     this.queue = [];
     for (let i = 0; i < this.count; i++) this.spawn(i * 0.15);
+  }
+
+  // One more target joins, up to the most the shop holds.
+  grow() {
+    if (this.count >= MAX_TARGETS) return;
+    this.count++;
+    this.spawn(1.2);
   }
 
   remove(t) {

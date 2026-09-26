@@ -195,8 +195,8 @@ function armchair(shop, x, z, ry) {
     mesh(cyl(0.035, 0.025, 0.14, 10), m.walnut, g, [s * 0.36, 0.07, 0.32]);
     mesh(cyl(0.035, 0.025, 0.14, 10), m.walnut, g, [s * 0.36, 0.07, -0.32]);
   }
-  shop.box(g, [0.9, 0.7, 0.85], [0, 0.35, 0], shop.silent());
-  shop.box(back, [0.9, 0.8, 0.2], [0, 0, 0], shop.silent());
+  shop.box(g, [0.9, 0.7, 0.85], [0, 0.35, 0], shop.cushion());
+  shop.box(back, [0.9, 0.8, 0.2], [0, 0, 0], shop.cushion());
 }
 
 function ladder(shop, x0, x1, y1, z) {
