@@ -6,24 +6,24 @@ const PI = Math.PI;
 const RADIUS = 0.3;
 
 const SPAWNS = [
-  { p: [-1.8, 1.45, 1.1], type: 'post' },
-  { p: [2.5, 1.7, 3.0], type: 'post' },
-  { p: [-5.2, 2.2, -2.2], type: 'post' },
-  { p: [5.6, 2.3, -2.6], type: 'post' },
-  { p: [0, 1.3, -5.9], type: 'post' },
+  { p: [-1.5, 1.45, 1.0], type: 'post' },
+  { p: [1.5, 1.6, 1.0], type: 'post' },
+  { p: [-5.4, 2.2, -3.2], type: 'post' },
+  { p: [5.0, 2.3, -3.4], type: 'post' },
+  { p: [-1.8, 1.4, -4.4], type: 'post' },
   { p: [-8.2, 1.5, 3.2], type: 'post' },
-  { p: [8.4, 1.6, -1.2], type: 'post' },
+  { p: [8.4, 1.6, -0.6], type: 'post' },
   { p: [-6.9, MEZZ.y + 1.5, -7.1], type: 'post', floor: MEZZ.y },
   { p: [3.6, MEZZ.y + 1.5, -7.1], type: 'post', floor: MEZZ.y },
-  { p: [-3.3, 3.0, -1.5], type: 'hang' },
+  { p: [-3.3, 3.0, -1.0], type: 'hang' },
   { p: [3.1, 3.4, -2.7], type: 'hang' },
-  { p: [-6.6, 3.8, -4.6], type: 'hang' },
+  { p: [-4.8, 4.2, -3.4], type: 'hang' },
   { p: [6.7, 4.4, 0.0], type: 'hang' },
   { p: [-2.2, 3.7, -0.4], type: 'hang' },
-  { p: [0, 1.55, -1.3], type: 'slide', range: 2.0, speed: 0.9 },
+  { p: [0, 1.55, -1.0], type: 'slide', range: 1.8, speed: 0.9 },
   { p: [0, 3.3, -0.5], type: 'slide', range: 3.2, speed: 0.6 },
   { p: [-4.2, 4.6, -5.9], type: 'slide', range: 2.2, speed: 1.1 },
-  { p: [4.8, 4.4, -5.6], type: 'slide', range: 1.8, speed: 1.3 },
+  { p: [4.3, 4.4, -5.8], type: 'slide', range: 1.5, speed: 1.3 },
 ];
 
 function bullseyeTex() {
@@ -101,6 +101,8 @@ export class Targets {
 
     const holder = new THREE.Group();
     root.add(holder);
+    // Cords and the point each is tied to, so a struck target's cords can recoil there.
+    const cords = [];
     const disc = new THREE.Mesh(this.discGeo, [m.rim, m.face, m.rim]);
     disc.rotation.x = PI / 2;
     disc.castShadow = true;
@@ -125,6 +127,7 @@ export class Targets {
         const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, cord), m.rope);
         rope.position.set(sx, -cord / 2, 0);
         holder.add(rope);
+        cords.push({ rope, len: cord, anchor: 0 });
       }
     } else {
       const top = 0.5;
@@ -132,6 +135,7 @@ export class Targets {
         const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, top), m.rope);
         rope.position.set(sx, top / 2 + RADIUS * 0.6, 0);
         holder.add(rope);
+        cords.push({ rope, len: top, anchor: top + RADIUS * 0.6 });
       }
       const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, s.range * 2 + 1), m.rail);
       rail.rotation.z = PI / 2;
@@ -148,7 +152,7 @@ export class Targets {
     const body = new CANNON.Body({ mass: 0, type: CANNON.Body.KINEMATIC, material: this.pm.hard });
     body.addShape(new CANNON.Cylinder(RADIUS, RADIUS, 0.12, 16));
     const t = {
-      spawn: s, root, holder, disc, body, state: 'popping', age: -delay,
+      spawn: s, root, holder, disc, body, cords, state: 'popping', age: -delay,
       phase: Math.random() * 10, dying: 0,
       // A simple pendulum swings at sqrt(g / L) whatever its amplitude.
       omega: s.type === 'hang' ? Math.sqrt(9.81 / (ROOM.H - s.p[1])) : 0,
@@ -176,6 +180,8 @@ export class Targets {
     if (t.state !== 'up' && t.state !== 'popping') return false;
     t.state = 'dying';
     t.dying = 0;
+    t.fall = 0;
+    t.tumble = (Math.random() < 0.5 ? -1 : 1) * (5 + Math.random() * 5);
     t.body.collisionResponse = false;
     return true;
   }
@@ -198,10 +204,27 @@ export class Targets {
       }
       if (t.state === 'dying') {
         t.dying += dt;
-        t.holder.rotation.y += dt * 22;
-        t.holder.position.y -= dt * t.dying * 6;
-        t.root.scale.setScalar(Math.max(0.001, 1 - t.dying / 0.7));
-        if (t.dying > 0.7) {
+        const d = t.disc;
+        if (s.type === 'post') {
+          // A shooting-gallery target: knocked flat backwards on its bottom edge.
+          const a = Math.min(1, t.dying / 0.35) ** 2 * PI / 2;
+          d.rotation.x = PI / 2 - a;
+          d.position.y = -RADIUS + RADIUS * Math.cos(a);
+          d.position.z = -RADIUS * Math.sin(a);
+        } else {
+          // The cords snap and recoil to where they are tied; the disc drops and tumbles.
+          const k = Math.max(0.001, 1 - t.dying / 0.25);
+          for (const c of t.cords) {
+            c.rope.scale.y = k;
+            c.rope.position.y = c.anchor - c.len * k / 2;
+          }
+          t.fall += 9 * dt;
+          d.position.y -= t.fall * dt;
+          d.rotation.x += t.tumble * dt;
+          d.rotation.z += t.tumble * 0.4 * dt;
+        }
+        if (t.dying > 0.8) t.root.scale.setScalar(Math.max(0.001, 1 - (t.dying - 0.8) / 0.2));
+        if (t.dying > 1.0) {
           this.remove(t);
           this.list.splice(this.list.indexOf(t), 1);
           this.spawn(0.6);

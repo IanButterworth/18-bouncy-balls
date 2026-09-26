@@ -7,31 +7,43 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { VignetteShader } from 'three/addons/shaders/VignetteShader.js';
-import { Music, LEVEL_NAMES } from './audio.js';
+import { Music, LEVEL_NAMES, PULSE, BAR } from './audio.js';
 import { Shop, buildShop } from './shop.js';
 import { buildDecor, SUN_DIR } from './decor.js';
 import { buildPercussion } from './percussion.js';
+import { buildOrgan } from './organ.js';
 import { Targets } from './targets.js';
 import { Effects } from './effects.js';
 
 const ROUND_SECONDS = 90;
 const BALL_R = 0.11;
 const BALL_SPEED = 15;
-const BALL_LIFE = 24;
-const MAX_BALLS = 60;
+// Balls live long enough for their patterns to overlap and build, then fade so the texture turns over.
+const BALL_LIFE = 40;
+const MAX_BALLS = 48;
 const GRAVITY = 9;
-// Held fire follows the rhythm of lilting 6/8 phrases, like a barcarolle. Each entry
-// is [length in sixteenths, melody step]; a null step is a breath with no ball.
-const SIXTEENTH = 0.11;
-const PHRASES = [
-  [[2, 0], [1, 1], [1, 2], [2, 4], [2, 3], [4, 2]],
-  [[3, 4], [1, 3], [2, 2], [2, 1], [2, 2], [2, null]],
-  [[1, 0], [1, 1], [1, 2], [1, 3], [1, 4], [1, 5], [2, 4], [2, 2], [2, null]],
-  [[4, 2], [2, 4], [3, 5], [1, 4], [2, 2]],
-  [[2, 5], [2, 4], [2, 2], [2, 4], [4, 1]],
-  [[1, 6], [1, 5], [1, 4], [1, 3], [2, 2], [2, 1], [4, null]],
-  [[3, 2], [1, 3], [2, 4], [3, 6], [1, 5], [2, 4]],
+// Held fire claps out a 12-pulse pattern, one for each section of the chord cycle,
+// listed in the order its notes build up. The cycle opens and closes on the pattern
+// of Reich's Clapping Music; between, the patterns thin out and thicken again.
+const SECTION_PATTERNS = [
+  [0, 7, 4, 10, 2, 5, 9, 1],
+  [0, 6, 3, 9],
+  [0, 6, 3, 9, 1, 7],
+  [0, 4, 8, 2, 6, 10],
+  [0, 3, 6, 9, 1, 4, 7, 10],
+  [0, 7, 2, 5, 10],
+  [0, 4, 8, 2, 6, 10, 1, 5, 9],
+  [0, 5, 10, 3, 8],
+  [0, 1, 6, 7, 3, 9],
+  [0, 9, 5, 2, 11, 7],
+  [0, 7, 4, 10, 2, 5, 9, 1, 11],
 ];
+// Held fire starts from this many notes of the pattern and adds one per bar held.
+const PATTERN_START = 3;
+// A ball bouncing on an instrument that keeps a pattern bounces for a whole number of pulses.
+const OSTINATO_PULSES = [2, 8];
+// Balls a struck target drops onto the bars, one every other pulse.
+const CASCADE = 8;
 const CAMERA_POS = new THREE.Vector3(0, 1.85, 6.7);
 
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
@@ -117,11 +129,15 @@ for (const [other, restitution, friction] of [
 const shop = new Shop(scene, world, pm);
 const { chair } = buildShop(shop);
 buildPercussion(shop, chair);
+buildOrgan(shop);
 const decor = buildDecor(shop);
 shop.finalize();
 const targets = new Targets(scene, world, pm);
 const fx = new Effects(scene, camera);
 const music = new Music();
+music.leslieAt = shop.leslie.pos;
+music.churchAt = shop.church.pos;
+music.comboAt = shop.combo.pos;
 
 // --- launcher: a brass bell that follows the aim ------------------------------------------
 
@@ -207,6 +223,18 @@ function onCollide(ball, e) {
   pending.push({ ball, other, impact, point });
 }
 
+// Tunes a bounce off a bar, piano or maraca so the ball comes back down a whole number
+// of pulses later, and nearly straight down, so it keeps landing on the same note.
+// Each ball becomes an ostinato; balls with different lengths phase against each other.
+function lockToPulse(body) {
+  const vy = body.velocity.y;
+  if (vy < 0.5) return;
+  const pulses = clamp(Math.round(2 * vy / GRAVITY / PULSE), ...OSTINATO_PULSES);
+  body.velocity.y = pulses * PULSE * GRAVITY / 2;
+  body.velocity.x *= 0.08;
+  body.velocity.z *= 0.08;
+}
+
 function handleCollision({ ball, other, impact, point }) {
   const vel = clamp(impact / 11, 0, 1);
   if (other.ball) return;
@@ -220,6 +248,19 @@ function handleCollision({ ball, other, impact, point }) {
   }
   const inst = other.inst;
   if (!inst || !inst.voice) return;
+  if (inst.ostinato) lockToPulse(ball.body);
+  if (inst.swell) {
+    const now = performance.now();
+    if (now - inst.last < 400) return;
+    inst.last = now;
+    if (inst.swell === 'church') music.churchSwell(2);
+    else if (inst.swell === 'combo') music.comboSwell(1);
+    else music.swell(1);
+    music.addEnergy(vel);
+    shop.hit(inst, vel);
+    fx.note(point, 57, vel);
+    return;
+  }
   const now = performance.now();
   if (now - inst.last < 45) return;
   inst.last = now;
@@ -260,7 +301,15 @@ function hitTarget(t, ball, point) {
   if (mult > 1) subs.push(`${LEVEL_NAMES[music.level]} ×${mult}`);
   if (playing) fx.popup(point, `+${points.toLocaleString()}`, subs.join(' · '), bank + mult > 3);
   fx.burst(point, 50 + 15 * mult);
-  music.targetChime(point.toArray(), bank + mult);
+  // The target itself rings once, like a struck bar.
+  music.hit('metallophone', 79, 91, Math.random(), 0, 0.8, point.toArray());
+  if (music.cue()) {
+    if (playing) fx.popup(point, 'Next section', '', false);
+    // The patterns already bouncing carry on through the change, and a cascade of
+    // balls drops onto the bars to build new ones.
+    for (const b of balls) if (!b.dying) b.age = Math.max(0, b.age - 10);
+    cascade = CASCADE;
+  }
   music.addEnergy(1);
   music.addEnergy(1);
 }
@@ -312,22 +361,54 @@ $('free').addEventListener('click', () => start('free'));
 
 const pointer = new THREE.Vector2(0, 0);
 const crosshair = $('crosshair');
-let firing = false;
-const melody = { phrase: null, i: 0, wait: 0 };
+let firing = false, tapPending = false, lastPulse = -1, cascade = 0;
+// The gun's pattern, in build-up order, and how many of its notes are sounding.
+const gun = { order: [...SECTION_PATTERNS[0]], beats: PATTERN_START, heldBar: -99 };
 
+// A press fires on the next pulse. Holding on across bars builds the pattern up;
+// letting go for more than a bar starts it again from the first few notes.
 function startFiring() {
   if (firing) return;
   firing = true;
-  melody.phrase = null;
-  melody.wait = 0;
+  tapPending = true;
+  const bar = Math.floor(lastPulse / BAR);
+  if (bar - gun.heldBar > 1) gun.beats = PATTERN_START;
 }
 
-function nextNote() {
-  if (!melody.phrase || melody.i >= melody.phrase.length) {
-    melody.phrase = PHRASES[Math.floor(Math.random() * PHRASES.length)];
-    melody.i = 0;
+// Drops a ball from the beams straight onto a random bar of the ensemble.
+function dropBall() {
+  const bars = shop.instruments.filter(i => i.ostinato && ['mallet', 'xylo', 'metallophone'].includes(i.voice));
+  const bar = bars[Math.floor(Math.random() * bars.length)];
+  const p = bar.node.getWorldPosition(new THREE.Vector3());
+  const ball = launch(new THREE.Vector3(p.x, 6.2, p.z), p);
+  ball.body.velocity.set(0, 0, 0);
+  ball.body.angularVelocity.set(0, 0, 0);
+}
+
+// Once a bar, the gun's pattern takes one step towards the current section's: one
+// note that no longer belongs drops out and one new note joins at the end of the
+// build-up order, so a new section's rhythm arrives gradually, as in the piece.
+function morphGun() {
+  const target = SECTION_PATTERNS[music.section];
+  const drop = gun.order.findIndex(p => !target.includes(p));
+  if (drop >= 0) gun.order.splice(drop, 1);
+  const add = target.find(p => !gun.order.includes(p));
+  if (add !== undefined) gun.order.push(add);
+}
+
+function onPulse(q) {
+  const bar = Math.floor(q / BAR), pos = q % BAR;
+  if (pos === 0) morphGun();
+  if (cascade > 0 && q % 2 === 0) {
+    dropBall();
+    cascade--;
   }
-  return melody.phrase[melody.i++];
+  if (firing) {
+    if (pos === 0 && gun.heldBar === bar - 1) gun.beats = Math.min(gun.order.length, gun.beats + 1);
+    gun.heldBar = bar;
+    if (tapPending || gun.order.slice(0, gun.beats).includes(pos)) fire(pointer);
+    tapPending = false;
+  }
 }
 
 function setPointer(e) {
@@ -423,14 +504,11 @@ function frame(now) {
   camera.rotation.x += (pitch - camera.rotation.x) * Math.min(1, dt * 4);
 
   if (game.state === 'playing') {
-    if (firing) {
-      melody.wait -= dt;
-      while (melody.wait <= 0) {
-        const [len, step] = nextNote();
-        if (step !== null) fire(pointer);
-        // A little rubato, so it breathes like a player rather than a sequencer.
-        melody.wait += len * SIXTEENTH * (0.93 + Math.random() * 0.14);
-      }
+    // Shots go out on the shop's pulse, never between.
+    const q = music.pulseIndex();
+    if (q > lastPulse) {
+      for (let p = Math.max(lastPulse + 1, q - 2); p <= q; p++) onPulse(p);
+      lastPulse = q;
     }
     if (game.mode === 'timed') {
       game.time -= dt;
@@ -480,6 +558,9 @@ function frame(now) {
     b.holder.scale.set(scale * (1 + s * 0.6), scale * (1 - s), scale * (1 + s * 0.6));
   }
 
+  if (music.ctx) shop.metronome.rotation.z = 0.45 * Math.sin(Math.PI * (music.ctx.currentTime - music.t0) / (2 * PULSE));
+  shop.leslie.horn.rotation.y += music.rotor.horn * 2 * Math.PI * dt;
+  shop.leslie.drum.rotation.y += music.rotor.drum * 2 * Math.PI * dt;
   shop.update(dt);
   decor.update(dt);
   targets.update(dt);
@@ -507,7 +588,7 @@ function updateHud(dt) {
   });
   $('mult').textContent = `×${lv + 1}`;
   $('level').textContent = LEVEL_NAMES[lv];
-  $('chord').textContent = music.ctx ? `♪ ${music.chord().name}` : '';
+  $('chord').textContent = music.ctx ? music.sectionName : '';
   $('hud').dataset.level = lv;
 }
 

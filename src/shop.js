@@ -167,114 +167,6 @@ function panelTex(base = '#3d2213') {
   });
 }
 
-function ringsTex(inner, outer, n = 60) {
-  return canvasTex(8, 256, (g, w, h) => {
-    for (let y = 0; y < h; y++) {
-      const t = y / h;
-      const l = 45 + 12 * Math.sin(t * n) + 8 * Math.sin(t * n * 2.7);
-      g.fillStyle = `hsl(${inner + (outer - inner) * t},62%,${l}%)`;
-      g.fillRect(0, y, w, 1);
-    }
-  });
-}
-
-function gongTex() {
-  return canvasTex(512, 512, (g, w, h) => {
-    const cx = w / 2, cy = h / 2;
-    const grad = g.createRadialGradient(cx, cy, 10, cx, cy, w / 2);
-    grad.addColorStop(0, '#6b4a1e');
-    grad.addColorStop(0.25, '#c9962f');
-    grad.addColorStop(0.55, '#e0b44c');
-    grad.addColorStop(0.9, '#b07d27');
-    grad.addColorStop(1, '#7a5418');
-    g.fillStyle = grad;
-    g.fillRect(0, 0, w, h);
-    for (let r = 20; r < w / 2; r += rand(5, 12)) {
-      g.strokeStyle = `rgba(${Math.random() < 0.5 ? '60,35,10' : '255,230,160'},${rand(0.08, 0.2)})`;
-      g.lineWidth = rand(1, 3);
-      g.beginPath();
-      g.arc(cx, cy, r, 0, PI * 2);
-      g.stroke();
-    }
-  });
-}
-
-function drumHeadTex(draw) {
-  return canvasTex(512, 512, (g, w, h) => {
-    g.fillStyle = '#ead8ab';
-    g.fillRect(0, 0, w, h);
-    draw(g, w, h);
-  });
-}
-
-// The bass drum's painted head: a Paris sunset.
-function jazzHeadTex() {
-  return drumHeadTex((g, w, h) => {
-    const cx = w / 2, cy = h / 2;
-    const sky = g.createLinearGradient(0, 90, 0, 420);
-    sky.addColorStop(0, '#2d3b6b');
-    sky.addColorStop(0.55, '#e0765a');
-    sky.addColorStop(1, '#f6c56a');
-    g.fillStyle = sky;
-    g.beginPath();
-    g.arc(cx, cy, 190, 0, PI * 2);
-    g.fill();
-    g.fillStyle = '#ffe6a0';
-    g.beginPath();
-    g.arc(cx + 70, cy + 40, 46, 0, PI * 2);
-    g.fill();
-    g.fillStyle = '#1b1616';
-    g.beginPath();
-    g.moveTo(cx - 70, cy + 150);
-    g.quadraticCurveTo(cx - 20, cy + 40, cx - 6, cy - 140);
-    g.lineTo(cx + 6, cy - 140);
-    g.quadraticCurveTo(cx + 20, cy + 40, cx + 70, cy + 150);
-    g.lineTo(cx + 40, cy + 150);
-    g.quadraticCurveTo(cx, cy + 90, cx - 40, cy + 150);
-    g.fill();
-    g.fillRect(cx - 44, cy + 60, 88, 8);
-    g.fillRect(cx - 26, cy - 10, 52, 6);
-    g.fillRect(cx - 1.5, cy - 175, 3, 40);
-    g.fillRect(0, cy + 150, w, 60);
-    g.globalCompositeOperation = 'destination-in';
-    g.beginPath();
-    g.arc(cx, cy, 190, 0, PI * 2);
-    g.rect(0, 0, w, h);
-    g.fill('evenodd');
-    g.globalCompositeOperation = 'source-over';
-    g.fillStyle = '#ead8ab';
-    g.beginPath();
-    g.arc(cx, cy, 256, 0, PI * 2);
-    g.arc(cx, cy, 190, 0, PI * 2, true);
-    g.fill();
-    g.strokeStyle = '#b5892f';
-    g.lineWidth = 8;
-    g.beginPath();
-    g.arc(cx, cy, 194, 0, PI * 2);
-    g.stroke();
-    g.fillStyle = '#9e1b2a';
-    g.font = 'italic bold 70px Georgia, serif';
-    g.textAlign = 'center';
-    g.fillText('Ricochet', cx, cy - 60);
-  });
-}
-
-function crestHeadTex() {
-  return drumHeadTex((g, w, h) => {
-    g.strokeStyle = '#b5892f';
-    g.lineWidth = 10;
-    g.beginPath();
-    g.arc(w / 2, h / 2, 180, 0, PI * 2);
-    g.stroke();
-    g.fillStyle = '#7d1622';
-    g.textAlign = 'center';
-    g.font = 'bold italic 76px Georgia, serif';
-    g.fillText('Fanfare', w / 2, h / 2 + 10);
-    g.font = 'bold 34px Georgia, serif';
-    g.fillText('DE PARIS', w / 2, h / 2 + 60);
-  });
-}
-
 function streetTex() {
   return canvasTex(512, 768, (g, w, h) => {
     const sky = g.createLinearGradient(0, 0, 0, h);
@@ -737,20 +629,13 @@ function buildCounter(shop) {
   mesh(box(7.3, 0.03, 0.02), m.gold, g, [0, 0.9, 0.36]);
   shop.box(g, [7.4, 1.02, 0.84], [0, 0.5, 0], shop.silent());
 
-  // A service bell, for the customers.
-  const bell = group(g, [2.5, 1.01, -0.1]);
-  mesh(cyl(0.09, 0.1, 0.03, 32), m.ebony, bell, [0, 0.015, 0]);
-  mesh(new THREE.SphereGeometry(0.08, 32, 16, 0, PI * 2, 0, PI / 2), m.brass, bell, [0, 0.03, 0]);
-  mesh(cyl(0.008, 0.008, 0.04), m.brass, bell, [0, 0.12, 0]);
-  mesh(new THREE.SphereGeometry(0.018, 12, 8), m.brass, bell, [0, 0.14, 0]);
-  const binst = shop.instrument(bell, { voice: 'bell', lo: 84, hi: 96, slot: 1, arp: false, glow: 0xffffff });
-  shop.sphere(bell, 0.1, [0, 0.05, 0], binst);
-
+  // A metronome that swings in time with the shop's pulse.
   const met = group(g, [-2.0, 1.01, -0.1], [0, 0.4, 0]);
   mesh(new THREE.CylinderGeometry(0.02, 0.09, 0.26, 4), m.walnut, met, [0, 0.13, 0], [0, PI / 4, 0]);
-  mesh(box(0.008, 0.2, 0.008), m.brass, met, [0.02, 0.16, 0.065], [0, 0, 0.3]);
-  const minst = shop.instrument(met, { voice: 'wood', lo: 72, hi: 84, slot: 0.5 });
-  shop.box(met, [0.16, 0.26, 0.16], [0, 0.13, 0], minst);
+  shop.metronome = group(met, [0, 0.03, 0.066]);
+  mesh(box(0.008, 0.22, 0.008), m.brass, shop.metronome, [0, 0.11, 0]);
+  mesh(box(0.03, 0.02, 0.012), m.brass, shop.metronome, [0, 0.16, 0]);
+  shop.box(met, [0.16, 0.26, 0.16], [0, 0.13, 0], shop.silent());
 
   // A brass cash register, silent apart from the balls rattling off it.
   const reg = group(g, [3.3, 1.01, -0.1], [0, -0.35, 0]);
@@ -764,9 +649,9 @@ function buildCounter(shop) {
 
 // --- floor instruments -------------------------------------------------------------------
 
-function buildMarimba(shop, x, z) {
+function buildMarimba(shop, x, z, ry = 0) {
   const m = materials(), R = shop.root;
-  const g = group(R, [x, 0, z]);
+  const g = group(R, [x, 0, z], [0, ry, 0]);
   const n = 13, span = 2.7;
   for (const s of [-1, 1]) mesh(box(span + 0.3, 0.07, 0.07), m.walnut, g, [0, 0.86, s * 0.3]);
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) mesh(cyl(0.03, 0.035, 0.86, 12), m.walnut, g, [sx * (span / 2 + 0.1), 0.43, sz * 0.3]);
@@ -779,37 +664,9 @@ function buildMarimba(shop, x, z) {
     const bar = mesh(rbox(0.17, 0.045, len, 0.015), gloss(color, 0.4), g, [bx, 0.92, 0]);
     const tube = 0.5 - 0.3 * i / (n - 1);
     mesh(cyl(0.045, 0.045, tube, 16), m.brass, g, [bx, 0.84 - tube / 2, 0]);
-    const inst = shop.instrument(bar, { voice: 'mallet', lo: 62, hi: 93, slot: i / (n - 1), arp: false, wobble: 'bob', glow: 0xffb070 });
+    const inst = shop.instrument(bar, { voice: 'mallet', lo: 57, hi: 88, slot: i / (n - 1), arp: false, ostinato: true, wobble: 'bob', glow: 0xffb070 });
     shop.box(bar, [0.17, 0.06, len], [0, 0, 0], inst);
   }
-}
-
-export function makeDrum(r, h, shellMat, headTex, hoopMat) {
-  const m = materials();
-  const g = new THREE.Group();
-  doubleSided(mesh(cyl(r, r, h, 40, true), shellMat, g));
-  const headTop = headTex ? std(0xffffff, 0.65, 0, { map: headTex }) : m.head;
-  mesh(new THREE.CircleGeometry(r, 40), headTop, g, [0, h / 2, 0], [-PI / 2, 0, 0]);
-  mesh(new THREE.CircleGeometry(r, 40), m.head, g, [0, -h / 2, 0], [PI / 2, 0, 0]);
-  for (const y of [-h / 2, h / 2]) mesh(new THREE.TorusGeometry(r + 0.004, 0.014, 8, 48), hoopMat ?? m.chrome, g, [0, y, 0], [PI / 2, 0, 0]);
-  for (let i = 0; i < 8; i++) {
-    const a = i / 8 * PI * 2;
-    mesh(rbox(0.02, h * 0.45, 0.025, 0.008), m.chrome, g, [Math.cos(a) * (r + 0.01), 0, Math.sin(a) * (r + 0.01)], [0, -a, 0]);
-  }
-  return g;
-}
-
-function cymbalGeo(r) {
-  const pts = [[0, 0.035], [r * 0.12, 0.034], [r * 0.2, 0.02], [r * 0.25, 0.012], [r * 0.6, 0.006], [r, 0]];
-  return new THREE.LatheGeometry(pts.map(([a, b]) => new THREE.Vector2(a, b)), 48);
-}
-
-let cymbalMat;
-export function cymbal(parent, r, pos, rot) {
-  cymbalMat ??= std(0xffffff, 0.32, 1, { map: ringsTex(38, 44), side: THREE.DoubleSide });
-  const g = group(parent, pos, rot);
-  mesh(cymbalGeo(r), cymbalMat, g);
-  return g;
 }
 
 export function tripod(parent, x, z, top, mat) {
@@ -818,69 +675,6 @@ export function tripod(parent, x, z, top, mat) {
     const a = i / 3 * PI * 2 + 0.5;
     rod(parent, [x, 0.3, z], [x + Math.cos(a) * 0.25, 0.01, z + Math.sin(a) * 0.25], 0.01, mat);
   }
-}
-
-// A 1920s jazz kit in white pearl.
-function buildDrumKit(shop, x, z, ry) {
-  const m = materials(), R = shop.root;
-  const g = group(R, [x, 0, z], [0, ry, 0]);
-
-  const bd = group(g, [0, 0.4, 0]);
-  const bass = makeDrum(0.38, 0.36, m.pearl, jazzHeadTex(), m.walnut);
-  bass.rotation.x = PI / 2;
-  bd.add(bass);
-  for (const s of [-1, 1]) rod(g, [s * 0.25, 0.1, 0.1], [s * 0.36, 0.0, 0.3], 0.01, m.chrome);
-  const kick = shop.instrument(bd, { voice: 'kick', lo: 26, hi: 38, slot: 0, arp: false, glow: 0xff9a6a });
-  shop.cyl(bd, 0.38, 0.36, [0, 0, 0], kick, 'drum', [PI / 2, 0, 0]);
-
-  const toms = [
-    { pos: [-0.22, 1.0, -0.02], r: 0.16, h: 0.18, rot: [0.45, 0, 0.12], slot: 0.35 },
-    { pos: [0.24, 1.0, -0.02], r: 0.17, h: 0.2, rot: [0.45, 0, -0.12], slot: 0.9 },
-  ];
-  for (const t of toms) {
-    const tg = group(g, t.pos, t.rot);
-    tg.add(makeDrum(t.r, t.h, m.pearl, null, m.walnut));
-    rod(g, [t.pos[0] * 0.3, 0.75, 0], t.pos, 0.012, m.chrome);
-    const inst = shop.instrument(tg, { voice: 'tom', lo: 45, hi: 62, slot: t.slot, arp: false, glow: 0xff9a6a });
-    shop.cyl(tg, t.r, t.h, [0, 0, 0], inst, 'drum');
-  }
-
-  tripod(g, -0.62, 0.35, 0.55, m.chrome);
-  const sn = group(g, [-0.62, 0.62, 0.35], [0.15, 0, 0]);
-  sn.add(makeDrum(0.2, 0.14, m.brass));
-  const snInst = shop.instrument(sn, { voice: 'snare', lo: 55, hi: 67, slot: 0.5, arp: false, glow: 0xffffff });
-  shop.cyl(sn, 0.2, 0.14, [0, 0, 0], snInst, 'drum');
-
-  tripod(g, -1.05, 0.15, 0.95, m.chrome);
-  const hh = group(g, [-1.05, 0.97, 0.15]);
-  cymbal(hh, 0.18, [0, 0, 0]);
-  cymbal(hh, 0.18, [0, -0.02, 0], [PI, 0, 0]);
-  const hhInst = shop.instrument(hh, { voice: 'hihat', lo: 80, hi: 92, wobble: 'tilt', glow: 0xfff1b0 });
-  shop.cyl(hh, 0.18, 0.07, [0, 0, 0], hhInst);
-
-  const cymbals = [
-    { base: [-0.75, -0.35], pos: [-0.7, 1.55, -0.3], r: 0.27, rot: [0.35, 0, 0.25], voice: 'crash' },
-    { base: [0.9, -0.3], pos: [0.85, 1.4, -0.28], r: 0.31, rot: [0.3, 0, -0.2], voice: 'ride' },
-  ];
-  for (const c of cymbals) {
-    tripod(g, c.base[0], c.base[1], c.pos[1] - 0.03, m.chrome);
-    const cg = cymbal(g, c.r, c.pos, c.rot);
-    const inst = shop.instrument(cg, { voice: c.voice, lo: 79, hi: 91, slot: 0.5, wobble: 'tilt', glow: 0xfff1b0 });
-    shop.cyl(cg, c.r, 0.07, [0, 0.01, 0], inst);
-  }
-
-  // A pair of bongos on a stand, a Paris jazz-club touch.
-  tripod(g, 0.72, 0.35, 0.62, m.chrome);
-  for (const [i, s] of [-1, 1].entries()) {
-    const bg = group(g, [0.72 + s * 0.12, 0.72, 0.35], [0.2, 0, 0]);
-    bg.add(makeDrum(0.1 + i * 0.02, 0.2, m.walnut, null, m.brass));
-    const inst = shop.instrument(bg, { voice: 'tom', lo: 60, hi: 76, slot: i, arp: false, glow: 0xff9a6a });
-    shop.cyl(bg, 0.12, 0.2, [0, 0, 0], inst, 'drum');
-  }
-
-  const stool = group(g, [0.05, 0, -0.75]);
-  mesh(cyl(0.2, 0.2, 0.09, 24), m.velvet, stool, [0, 0.52, 0]);
-  tripod(stool, 0, 0, 0.48, m.chrome);
 }
 
 function pianoShape() {
@@ -894,10 +688,10 @@ function pianoShape() {
   return shape;
 }
 
-function keyboard(parent, width, y, z, whites) {
+export function keyboard(parent, width, y, z, whites, naturals, sharps) {
   const m = materials();
   const kw = width / whites;
-  const white = new THREE.InstancedMesh(box(kw * 0.92, 0.025, 0.15), m.ivory, whites);
+  const white = new THREE.InstancedMesh(box(kw * 0.92, 0.025, 0.15), naturals ?? m.ivory, whites);
   const blackIdx = [];
   const d = new THREE.Object3D();
   for (let i = 0; i < whites; i++) {
@@ -907,7 +701,7 @@ function keyboard(parent, width, y, z, whites) {
     if ([0, 1, 3, 4, 5].includes(i % 7) && i < whites - 1) blackIdx.push(i);
   }
   parent.add(white);
-  const blacks = new THREE.InstancedMesh(box(kw * 0.55, 0.03, 0.09), m.ebony, blackIdx.length);
+  const blacks = new THREE.InstancedMesh(box(kw * 0.55, 0.03, 0.09), sharps ?? m.ebony, blackIdx.length);
   blackIdx.forEach((i, k) => {
     d.position.set(-width / 2 + (i + 1) * kw, y + 0.02, z - 0.04);
     d.updateMatrix();
@@ -941,7 +735,7 @@ function buildPiano(shop, x, z, ry) {
   for (const px of [-0.04, 0, 0.04]) mesh(box(0.025, 0.012, 0.09), m.brass, g, [px, 0.06, -0.3]);
 
   const pianoInst = shop.instrument(g, {
-    voice: 'piano', lo: 45, hi: 88, arp: false, wobble: 'none', glow: 0xffe2a0,
+    voice: 'piano', lo: 45, hi: 88, arp: false, ostinato: true, wobble: 'none', glow: 0xffe2a0,
     slotFrom: p => clamp01((g.worldToLocal(p).x + 0.75) / 1.5),
   });
   shop.box(g, [1.5, 0.34, 1.1], [0, 0.87, -0.55], pianoInst);
@@ -952,7 +746,7 @@ function buildPiano(shop, x, z, ry) {
   mesh(new THREE.ExtrudeGeometry(shape, { depth: 0.025, bevelEnabled: false, curveSegments: 24 }), m.black, lid, [0.75, 0, 0], [-PI / 2, 0, 0]);
   rod(g, [0.35, 1.04, -0.8], [0.35, 1.04 + 0.84, -0.8], 0.012, m.black);
   const lidInst = shop.instrument(lid, {
-    voice: 'piano', lo: 57, hi: 93, arp: false, wobble: 'flap', glow: 0xffe2a0,
+    voice: 'piano', lo: 57, hi: 93, arp: false, ostinato: true, wobble: 'flap', glow: 0xffe2a0,
     slotFrom: p => clamp01(lid.worldToLocal(p).x / 1.5),
   });
   shop.box(lid, [1.5, 0.07, 1.9], [0.75, 0.01, -0.95], lidInst);
@@ -963,98 +757,132 @@ function buildPiano(shop, x, z, ry) {
   shop.box(bench, [0.9, 0.1, 0.36], [0, 0.5, 0], shop.silent());
 }
 
-function buildChimes(shop, x, z) {
-  const m = materials(), R = shop.root, silent = shop.silent();
-  const g = group(R, [x, 0, z]);
-  for (const sx of [-1.45, 1.45]) {
-    mesh(cyl(0.035, 0.04, 3.8, 12), m.brass, g, [sx, 1.9, 0]);
-    mesh(rbox(0.12, 0.08, 0.7, 0.02), m.walnut, g, [sx, 0.04, 0]);
-    mesh(new THREE.SphereGeometry(0.06, 16, 12), m.gold, g, [sx, 3.85, 0]);
-    shop.cyl(g, 0.04, 3.8, [sx, 1.9, 0], silent);
-  }
-  mesh(rbox(3.0, 0.1, 0.1, 0.02), m.brass, g, [0, 3.75, 0]);
-  shop.box(g, [3.0, 0.12, 0.12], [0, 3.75, 0], silent);
-
-  const n = 10;
-  for (let i = 0; i < n; i++) {
-    const tx = -1.2 + i * 2.4 / (n - 1);
-    const L = 1.9 - i * 0.1;
-    const pivot = group(g, [tx, 3.66, 0]);
-    rod(pivot, [0, 0.04, 0], [0, -0.06, 0], 0.004, m.rope);
-    mesh(cyl(0.034, 0.034, 0.06, 16), m.gold, pivot, [0, -0.09, 0]);
-    mesh(cyl(0.028, 0.028, L, 20), m.chrome, pivot, [0, -0.12 - L / 2, 0]);
-    const inst = shop.instrument(pivot, { voice: 'chime', lo: 69, hi: 93, slot: i / (n - 1), arp: false, wobble: 'swing', glow: 0xd8ecff });
-    shop.cyl(pivot, 0.05, L, [0, -0.12 - L / 2, 0], inst);
-  }
+function harpsichordShape() {
+  const s = new THREE.Shape();
+  s.moveTo(-0.45, 0);
+  s.lineTo(0.45, 0);
+  s.lineTo(0.45, 0.3);
+  s.bezierCurveTo(0.45, 1.1, -0.05, 1.6, -0.25, 2.3);
+  s.lineTo(-0.45, 2.3);
+  s.lineTo(-0.45, 0);
+  return s;
 }
 
-function buildTimpani(shop, x, z, R0, slot) {
-  const m = materials();
-  const g = group(shop.root, [x, 0, z]);
-  const pts = [];
-  for (let k = 0; k <= 18; k++) {
-    const a = k / 18 * PI / 2;
-    pts.push(new THREE.Vector2(R0 * Math.sin(a), 0.8 - 0.55 * Math.cos(a)));
-  }
-  doubleSided(mesh(new THREE.LatheGeometry(pts, 48), m.copper, g));
-  mesh(cyl(R0 + 0.015, R0 + 0.015, 0.03, 48), m.head, g, [0, 0.815, 0]);
-  mesh(new THREE.TorusGeometry(R0 + 0.02, 0.018, 8, 48), m.chrome, g, [0, 0.8, 0], [PI / 2, 0, 0]);
-  for (let i = 0; i < 8; i++) {
-    const a = i / 8 * PI * 2;
-    rod(g, [Math.cos(a) * (R0 + 0.03), 0.82, Math.sin(a) * (R0 + 0.03)], [Math.cos(a) * (R0 * 0.9), 0.55, Math.sin(a) * (R0 * 0.9)], 0.008, m.chrome);
-  }
-  for (let i = 0; i < 3; i++) {
-    const a = i / 3 * PI * 2 + 0.3;
-    rod(g, [Math.cos(a) * R0 * 0.5, 0.35, Math.sin(a) * R0 * 0.5], [Math.cos(a) * R0 * 0.8, 0.04, Math.sin(a) * R0 * 0.8], 0.02, m.chrome);
-    mesh(new THREE.SphereGeometry(0.04, 10, 8), m.ebony, g, [Math.cos(a) * R0 * 0.8, 0.04, Math.sin(a) * R0 * 0.8]);
-  }
-  mesh(rbox(0.12, 0.04, 0.25, 0.01), m.ebony, g, [0, 0.03, R0 * 0.8]);
-  const inst = shop.instrument(g, { voice: 'timpani', lo: 36, hi: 52, slot, arp: false, amp: 0.5, glow: 0xffa060 });
-  shop.cyl(g, R0, 0.06, [0, 0.82, 0], inst, 'drum');
-  shop.cyl(g, R0 * 0.75, 0.55, [0, 0.5, 0], inst);
+// Maps a shape's own coordinates onto 0..1 texture space, for painted surfaces.
+function fitUVs(geo, [x0, x1], [y0, y1]) {
+  const pos = geo.attributes.position, uv = geo.attributes.uv;
+  for (let i = 0; i < pos.count; i++) uv.setXY(i, (pos.getX(i) - x0) / (x1 - x0), (pos.getY(i) - y0) / (y1 - y0));
+  return geo;
 }
 
-function buildGong(shop, x, z, ry) {
-  const m = materials(), silent = shop.silent();
-  const g = group(shop.root, [x, 0, z], [0, ry, 0]);
-  for (const sx of [-1.2, 1.2]) {
-    mesh(cyl(0.06, 0.07, 2.9, 16), m.red, g, [sx, 1.45, 0]);
-    mesh(rbox(0.16, 0.12, 0.8, 0.03), m.red, g, [sx, 0.06, 0]);
-    mesh(new THREE.ConeGeometry(0.08, 0.2, 16), m.gold, g, [sx, 3.0, 0]);
-    shop.cyl(g, 0.07, 2.9, [sx, 1.45, 0], silent);
-  }
-  mesh(rbox(2.7, 0.16, 0.16, 0.04), m.red, g, [0, 2.85, 0]);
-  mesh(box(2.4, 0.03, 0.17), m.gold, g, [0, 2.78, 0]);
-  shop.box(g, [2.7, 0.16, 0.16], [0, 2.85, 0], silent);
-
-  const pivot = group(g, [0, 2.77, 0]);
-  for (const sx of [-0.3, 0.3]) rod(pivot, [sx, 0, 0], [sx * 0.5, -0.36, 0], 0.008, m.rope);
-  const face = std(0xffffff, 0.35, 1, { map: gongTex() });
-  mesh(cyl(0.95, 0.95, 0.05, 64), [m.bronze, face, face], pivot, [0, -1.3, 0], [PI / 2, 0, 0]);
-  mesh(new THREE.TorusGeometry(0.95, 0.035, 12, 64), m.bronze, pivot, [0, -1.3, 0]);
-  const boss = mesh(new THREE.SphereGeometry(0.22, 24, 16), face, pivot, [0, -1.3, 0.02]);
-  boss.scale.z = 0.3;
-  const inst = shop.instrument(pivot, { voice: 'gong', lo: 38, hi: 50, slot: 0, arp: false, wobble: 'swing', amp: 0.35, glow: 0xffb040 });
-  shop.cyl(pivot, 0.95, 0.12, [0, -1.3, 0], inst, 'hard', [PI / 2, 0, 0]);
-
-  const mallet = group(g, [1.05, 0, 0.35], [0.1, 0, 0.25]);
-  mesh(cyl(0.015, 0.015, 0.9, 8), m.lightWood, mallet, [0, 0.45, 0]);
-  mesh(new THREE.SphereGeometry(0.08, 16, 12), m.cream, mallet, [0, 0.92, 0]);
+function pastoralTex() {
+  const t = canvasTex(256, 640, (g, w, h) => {
+    const sky = g.createLinearGradient(0, 0, 0, h);
+    sky.addColorStop(0, '#8fb0c8');
+    sky.addColorStop(0.6, '#f0dcb0');
+    sky.addColorStop(1, '#d8c090');
+    g.fillStyle = sky;
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = 'rgba(255,255,255,0.7)';
+    for (let k = 0; k < 6; k++) {
+      g.beginPath();
+      g.ellipse(40 + (k * 53) % 200, 60 + k * 50, 36, 12, 0, 0, PI * 2);
+      g.fill();
+    }
+    g.fillStyle = '#5d7040';
+    g.beginPath();
+    g.moveTo(0, h * 0.72);
+    g.bezierCurveTo(w * 0.3, h * 0.66, w * 0.6, h * 0.76, w, h * 0.7);
+    g.lineTo(w, h);
+    g.lineTo(0, h);
+    g.fill();
+    g.fillStyle = '#34462a';
+    for (let k = 0; k < 7; k++) {
+      g.beginPath();
+      g.arc(20 + k * 38, h * 0.7 - 10 - (k % 3) * 12, 18 + (k % 2) * 8, 0, PI * 2);
+      g.fill();
+    }
+    g.strokeStyle = '#c9a050';
+    g.lineWidth = 10;
+    g.strokeRect(5, 5, w - 10, h - 10);
+  });
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  return t;
 }
 
-function makeTambourine() {
-  const m = materials();
-  const g = new THREE.Group();
-  const inner = new THREE.Group();
-  inner.rotation.x = PI / 2;
-  g.add(inner);
-  doubleSided(mesh(cyl(0.13, 0.13, 0.05, 32, true), m.lightWood, inner));
-  mesh(new THREE.CircleGeometry(0.13, 32), m.head, inner, [0, 0.025, 0], [-PI / 2, 0, 0]);
-  for (let k = 0; k < 5; k++) {
-    const a = k / 5 * PI * 2;
-    for (const dy of [-0.008, 0.008]) mesh(cyl(0.022, 0.022, 0.004, 12), m.brass, inner, [Math.cos(a) * 0.13, dy, Math.sin(a) * 0.13], [0, 0, PI / 2]);
+function soundboardTex() {
+  const t = canvasTex(256, 640, (g, w, h) => {
+    g.fillStyle = '#e8d8b0';
+    g.fillRect(0, 0, w, h);
+    for (let k = 0; k < 40; k++) {
+      g.fillStyle = ['#b8403a', '#3a6aa0', '#d8a030', '#5a8a4a'][k % 4];
+      g.beginPath();
+      g.arc(hash(k, 1) * w, hash(k, 2) * h, 4 + 4 * hash(k, 3), 0, PI * 2);
+      g.fill();
+    }
+    g.strokeStyle = '#b08a3a';
+    g.lineWidth = 3;
+    g.beginPath();
+    g.arc(w * 0.6, h * 0.35, 28, 0, PI * 2);
+    g.stroke();
+  });
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  return t;
+}
+
+// A French double-manual harpsichord: painted case, reversed keyboards and a
+// landscape inside the lid, on a gilded stand.
+function buildHarpsichord(shop, x, z, ry) {
+  const m = materials(), R = shop.root;
+  const g = group(R, [x, 0, z], [0, ry, 0]);
+  const shape = harpsichordShape();
+  const paint = gloss(0x24483a, 0.35);
+  mesh(new THREE.ExtrudeGeometry(shape, { depth: 0.26, bevelEnabled: true, bevelThickness: 0.008, bevelSize: 0.008, bevelSegments: 2, curveSegments: 24 }), paint, g, [0, 0.74, 0], [-PI / 2, 0, 0]);
+  const band = mesh(new THREE.ExtrudeGeometry(shape, { depth: 0.025, bevelEnabled: false, curveSegments: 24 }), m.gold, g, [0, 0.95, 0], [-PI / 2, 0, 0]);
+  band.scale.set(1.012, 1.004, 1);
+  const board = new THREE.ShapeGeometry(shape, 24);
+  fitUVs(board, [-0.45, 0.45], [0, 2.3]);
+  const sb = mesh(board, std(0xffffff, 0.6, 0, { map: soundboardTex() }), g, [0, 1.005, -0.12], [-PI / 2, 0, 0]);
+  sb.scale.set(0.9, 0.93, 1);
+  for (let i = 0; i < 14; i++) {
+    const sx = -0.38 + i * 0.058;
+    const len = Math.max(0.3, 2.0 - i * 0.13);
+    mesh(box(0.003, 0.003, len), m.brass, g, [sx, 1.012, -0.2 - len / 2]).userData.noShadow = true;
   }
-  return g;
+  mesh(box(0.9, 0.1, 0.3), paint, g, [0, 0.82, 0.12]);
+  keyboard(g, 0.78, 0.88, 0.2, 28, m.ebony, m.ivory);
+  keyboard(g, 0.78, 0.95, 0.1, 28, m.ebony, m.ivory);
+  for (const s of [-1, 1]) mesh(box(0.06, 0.12, 0.3), paint, g, [s * 0.42, 0.9, 0.12]);
+  for (const [lx, lz] of [[-0.38, 0.05], [0.38, 0.05], [0.38, -0.85], [-0.38, -0.85], [-0.38, -2.05], [-0.1, -1.75]]) {
+    mesh(cyl(0.035, 0.025, 0.66, 12), m.gold, g, [lx, 0.37, lz]);
+    mesh(new THREE.SphereGeometry(0.05, 12, 8), m.gold, g, [lx, 0.5, lz]);
+  }
+  mesh(box(0.8, 0.04, 0.04), m.gold, g, [0, 0.12, -0.4]);
+
+  const inst = shop.instrument(g, {
+    voice: 'harpsichord', lo: 45, hi: 81, arp: false, ostinato: true, wobble: 'none', glow: 0xffe2a0,
+    slotFrom: p => clamp01((g.worldToLocal(p).x + 0.45) / 0.9),
+  });
+  shop.box(g, [0.9, 0.3, 1.2], [0, 0.87, -0.6], inst);
+  shop.box(g, [0.5, 0.3, 1.1], [-0.2, 0.87, -1.75], inst);
+  shop.box(g, [0.9, 0.16, 0.32], [0, 0.86, 0.13], inst);
+
+  // The lid is hinged along the straight side and painted inside with a landscape.
+  const lid = group(g, [-0.45, 1.005, 0], [0, 0, 0.75]);
+  mesh(new THREE.ExtrudeGeometry(shape, { depth: 0.02, bevelEnabled: false, curveSegments: 24 }), paint, lid, [0.45, 0, 0], [-PI / 2, 0, 0]);
+  const art = fitUVs(new THREE.ShapeGeometry(shape, 24), [-0.45, 0.45], [0, 2.3]);
+  mesh(art, std(0xffffff, 0.7, 0, { map: pastoralTex(), side: THREE.DoubleSide }), lid, [0.45, -0.003, 0], [-PI / 2, 0, 0]).scale.set(0.94, 0.96, 1);
+  rod(g, [0.2, 1.0, -0.8], [0.2, 1.0 + 0.58, -0.8], 0.01, m.gold);
+  const lidInst = shop.instrument(lid, {
+    voice: 'harpsichord', lo: 57, hi: 88, arp: false, ostinato: true, wobble: 'flap', glow: 0xffe2a0,
+    slotFrom: p => clamp01(lid.worldToLocal(p).x / 0.9),
+  });
+  shop.box(lid, [0.9, 0.06, 2.2], [0.45, 0.01, -1.1], lidInst);
+
+  const stool = group(g, [0, 0, 0.72]);
+  mesh(rbox(0.5, 0.07, 0.34, 0.02), m.velvet, stool, [0, 0.5, 0]);
+  for (const sx of [-0.2, 0.2]) for (const sz of [-0.13, 0.13]) mesh(cyl(0.02, 0.016, 0.47, 10), m.gold, stool, [sx, 0.24, sz]);
+  shop.box(stool, [0.5, 0.1, 0.34], [0, 0.5, 0], shop.silent());
 }
 
 function buildCafeChair(shop, x, z, ry) {
@@ -1205,9 +1033,9 @@ function buildHarp(shop, x, z, ry) {
   shop.box(g, [0.95, 1.75, 0.16], [0.4, 0.92, 0], inst);
 }
 
-function buildUpright(shop, x, z) {
+function buildUpright(shop, x, y, z, ry = 0) {
   const m = materials();
-  const g = group(shop.root, [x, MEZZ.y, z]);
+  const g = group(shop.root, [x, y, z], [0, ry, 0]);
   const wood = gloss(0x4a2414, 0.28);
   mesh(rbox(1.5, 1.3, 0.45, 0.03), wood, g, [0, 0.65, -0.05]);
   mesh(box(1.52, 0.05, 0.5), wood, g, [0, 1.32, -0.05]);
@@ -1223,22 +1051,10 @@ function buildUpright(shop, x, z) {
     flame.userData.noShadow = true;
   }
   const inst = shop.instrument(g, {
-    voice: 'piano', lo: 48, hi: 84, arp: false, wobble: 'none', glow: 0xffe2a0,
+    voice: 'piano', lo: 48, hi: 84, arp: false, ostinato: true, wobble: 'none', glow: 0xffe2a0,
     slotFrom: p => clamp01((g.worldToLocal(p).x + 0.75) / 1.5),
   });
   shop.box(g, [1.5, 1.35, 0.7], [0, 0.67, 0.05], inst);
-}
-
-function buildMezzBassDrum(shop, x, z) {
-  const m = materials();
-  const g = group(shop.root, [x, MEZZ.y, z]);
-  for (const s of [-1, 1]) rod(g, [s * 0.3, 0, 0], [s * 0.3, 0.55, 0], 0.015, m.brass);
-  const dn = group(g, [0, 0.62, 0]);
-  const drum = makeDrum(0.46, 0.34, m.red, crestHeadTex(), m.gold);
-  drum.rotation.x = PI / 2;
-  dn.add(drum);
-  const inst = shop.instrument(dn, { voice: 'kick', lo: 26, hi: 38, slot: 0.5, arp: false, glow: 0xff9a6a });
-  shop.cyl(dn, 0.46, 0.34, [0, 0, 0], inst, 'drum', [PI / 2, 0, 0]);
 }
 
 // --- brass -------------------------------------------------------------------------------
@@ -1269,12 +1085,6 @@ function buildCabinet(shop) {
 function buildShelfInstruments(shop, x0, x1, flip) {
   const m = materials(), R = shop.root, z = -7.75;
   const at = t => x0 + (x1 - x0) * (flip ? 1 - t : t);
-  [0.1, 0.5, 0.9].forEach((t, i) => {
-    const g = group(R, [at(t), 1.775 + 0.14, z + 0.05], [0.1, rand(-0.3, 0.3), 0]);
-    g.add(makeTambourine());
-    const inst = shop.instrument(g, { voice: 'jingle', lo: 72, hi: 88, slot: i / 2, glow: 0xfff0c0 });
-    shop.cyl(g, 0.14, 0.06, [0, 0, 0], inst, 'drum', [PI / 2, 0, 0]);
-  });
   [0.3, 0.7].forEach((t, i) => {
     const g = group(R, [at(t), 1.775 + 0.62, z + 0.05], [0, 0, 0.12 * (i ? -1 : 1)]);
     const { g: body, bodyY } = makeStringed(i ? 0x8a3a1c : 0xc98a3c, { w1: 0.11, w2: 0.075, L: 0.3, d: 0.08, neck: 0.2, head: 0.08, strings: 8 });
@@ -1282,14 +1092,6 @@ function buildShelfInstruments(shop, x0, x1, flip) {
     const inst = shop.instrument(g, { voice: 'pluck', lo: 67, hi: 86, slot: i, gliss: 2, wobble: 'rock', glow: 0xffc070 });
     shop.box(g, [0.24, 0.32, 0.1], [0, bodyY, 0], inst);
   });
-  for (let i = 0; i < 5; i++) {
-    const g = group(R, [at(0.1 + i * 0.2), 2.625, z + 0.05]);
-    mesh(cyl(0.012, 0.016, 0.1, 10), m.walnut, g, [0, 0.2, 0]);
-    doubleSided(mesh(flare(0.14, 0.03, 0.075, 2.2, 28), m.brass, g, [0, 0.15, 0], [PI, 0, 0]));
-    const inst = shop.instrument(g, { voice: 'glock', lo: 76, hi: 96, slot: i / 4, arp: false, glow: 0xfff0a0 });
-    shop.cyl(g, 0.08, 0.26, [0, 0.12, 0], inst);
-    if (i < 4) mesh(box(0.22, 0.04 + 0.03 * i, 0.3), m.cream, R, [at(0.2 + i * 0.2), 2.645 + 0.015 * i, z]);
-  }
 }
 
 // A glass display case of woodwinds, for looking at.
@@ -1323,37 +1125,7 @@ function buildVitrine(shop) {
 
 // --- hanging things ------------------------------------------------------------------------
 
-function buildBells(shop) {
-  const m = materials(), R = shop.root, H = ROOM.H;
-  const xs = [-2.6, -1.3, 0, 1.3, 2.6];
-  xs.forEach((x, i) => {
-    const bellY = 4.3 + Math.abs(i - 2) * 0.18;
-    const pivot = group(R, [x, H, 0.9]);
-    const drop = H - bellY;
-    rod(pivot, [0, 0, 0], [0, -drop + 0.12, 0], 0.006, m.rope);
-    mesh(cyl(0.018, 0.022, 0.1, 12), m.darkWood, pivot, [0, -drop + 0.08, 0]);
-    doubleSided(mesh(flare(0.16, 0.035, 0.1, 2.2, 32), m.gold, pivot, [0, -drop + 0.03, 0], [PI, 0, 0]));
-    mesh(new THREE.SphereGeometry(0.02, 10, 8), m.ebony, pivot, [0, -drop - 0.12, 0]);
-    const inst = shop.instrument(pivot, { voice: 'bell', lo: 72, hi: 96, slot: i / 4, arp: false, wobble: 'swing', amp: 0.3, glow: 0xfff0a0 });
-    shop.sphere(pivot, 0.12, [0, -drop - 0.05, 0], inst);
-  });
-}
-
-function buildTriangles(shop) {
-  const m = materials();
-  [-8.2, -3.4, 3.4, 8.2].forEach((x, i) => {
-    const pivot = group(shop.root, [x, MEZZ.y - 0.45, MEZZ.front + 0.12]);
-    rod(pivot, [0, 0, 0], [0, -0.28, 0], 0.004, m.rope);
-    const a = [0, -0.28], b = [-0.12, -0.49], c = [0.12, -0.49];
-    rod(pivot, [a[0] - 0.01, a[1] - 0.02, 0], [...b, 0], 0.007, m.chrome);
-    rod(pivot, [...b, 0], [...c, 0], 0.007, m.chrome);
-    rod(pivot, [...c, 0], [a[0] + 0.02, a[1] - 0.04, 0], 0.007, m.chrome);
-    const inst = shop.instrument(pivot, { voice: 'triangle', lo: 84, hi: 98, slot: i / 3, arp: false, wobble: 'swing', amp: 0.6, glow: 0xffffff });
-    shop.sphere(pivot, 0.15, [0, -0.42, 0], inst);
-  });
-}
-
-// Crystal chandeliers; struck, they tinkle a quick run of high notes.
+// Crystal chandeliers.
 function buildChandelier(shop, x, z, y) {
   const m = materials(), R = shop.root, H = ROOM.H;
   mesh(cyl(0.08, 0.1, 0.06, 16), m.iron, R, [x, H - 0.03, z]);
@@ -1390,8 +1162,7 @@ function buildChandelier(shop, x, z, y) {
   light.position.set(x, y + 0.1, z);
   R.add(light);
   shop.lights.push(light);
-  const inst = shop.instrument(pivot, { voice: 'crystal', lo: 84, hi: 100, arp: false, gliss: 3, wobble: 'swing', amp: 0.25, glow: 0xfff2c0 });
-  shop.cyl(pivot, 0.48, 0.5, [0, -drop, 0], inst);
+  shop.cyl(pivot, 0.48, 0.5, [0, -drop, 0], shop.silent());
 }
 
 export function buildShop(shop) {
@@ -1406,14 +1177,16 @@ export function buildShop(shop) {
   buildVitrine(shop);
   buildCounter(shop);
 
-  buildMarimba(shop, 0, 2.3);
-  buildDrumKit(shop, -3.4, -0.6, 0.35);
-  buildPiano(shop, 3.5, -0.2, -0.45);
-  buildChimes(shop, 0, -3.3);
-  buildTimpani(shop, -6.6, 1.7, 0.46, 0.5);
-  buildTimpani(shop, -7.9, 0.2, 0.52, 0);
-  buildGong(shop, 6.9, -4.9, -0.35);
-  const chair = buildCafeChair(shop, 2.0, 1.3, -0.5);
+  // The ensemble of Music for 18 Musicians, in an arc facing the counter: three
+  // marimbas in front, keyboards behind, one of them a harpsichord. Xylophones, metallophone and maracas are
+  // added with the rest of the percussion.
+  buildMarimba(shop, -2.9, 2.3, 0.35);
+  buildMarimba(shop, 0, 2.7, 0);
+  buildMarimba(shop, 2.9, 2.3, -0.35);
+  buildHarpsichord(shop, -3.0, -2.0, 0.3);
+  buildPiano(shop, 3.6, -2.2, -0.3);
+  buildUpright(shop, 0, 0, -5.0);
+  const chair = buildCafeChair(shop, 1.3, 0.6, -0.5);
 
   buildHarp(shop, -4.3, -7.3, 0.2);
   standingString(shop, -2.0, MEZZ.y, -7.35, 0.25, 0x7a3312,
@@ -1425,14 +1198,11 @@ export function buildShop(shop) {
   standingString(shop, 1.5, MEZZ.y, -7.4, 0.2, 0xa54a1c,
     { w1: 0.23, w2: 0.19, L: 0.76, d: 0.2, neck: 0.5, head: 0.17, strings: 4 },
     { voice: 'pluck', lo: 36, hi: 60, slot: 0.8 });
-  buildUpright(shop, 5.4, -7.55);
-  buildMezzBassDrum(shop, 8.4, -7.2);
+  buildUpright(shop, 5.4, MEZZ.y, -7.3);
   buildGuitars(shop);
   buildViolins(shop);
   buildCabinet(shop);
 
-  buildBells(shop);
-  buildTriangles(shop);
   buildChandelier(shop, -5, 0.4, 5.0);
   buildChandelier(shop, 5, 0.4, 5.0);
   buildChandelier(shop, 0, -1.2, 5.2);

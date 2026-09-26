@@ -1,45 +1,54 @@
 // All sound is synthesised with Web Audio and only ever comes from a ball striking
-// an instrument. Every pitched note is taken from the chord of the moment, so a pile
-// of simultaneous hits adds up to a fuller chord rather than a clash.
+// something. The shop keeps a steady pulse, in homage to Steve Reich's Music for 18
+// Musicians: every note lands on its grid and is drawn from the chord of the current
+// section, so a pile of bouncing balls interlocks into one shimmering pattern.
 
-// Impressionist harmony in the spirit of Debussy and Ravel: extended, modal chords
-// that drift from one to another by shared notes, with no set progression.
-// Each chord lists root, fifth, third, then the colour tones, so low registers can
-// keep to the plainer notes and leave the colour to the higher instruments.
-const CHORDS = [
+// A cycle of eleven chords in A major and F sharp minor, voiced as clusters. The
+// music stays on one until a struck target cues the next, as the vibraphone cues
+// each section of the piece. Each lists root, fifth, third, then its colour tones,
+// so low registers keep to the plainer notes.
+const CYCLE = [
   { name: 'Dmaj9', pcs: [2, 9, 6, 1, 4] },
-  { name: 'Bm11', pcs: [11, 6, 2, 9, 1, 4] },
-  { name: 'Gmaj7♯11', pcs: [7, 2, 11, 6, 9, 1] },
-  { name: 'Em9', pcs: [4, 11, 7, 2, 6] },
+  { name: 'E6sus', pcs: [4, 11, 9, 1, 6] },
   { name: 'F♯m11', pcs: [6, 1, 9, 4, 11] },
-  { name: 'Cmaj7♯11', pcs: [0, 7, 4, 11, 6, 2] },
-  { name: 'B♭maj7♯11', pcs: [10, 5, 2, 9, 4, 0] },
-  { name: 'A13sus', pcs: [9, 4, 2, 7, 11, 6] },
-  { name: 'D lydian', pcs: [2, 9, 6, 4, 11, 8] },
-  { name: 'whole-tone', pcs: [2, 8, 6, 0, 4, 10] },
+  { name: 'C♯m11', pcs: [1, 8, 4, 11, 6] },
+  { name: 'Bm11', pcs: [11, 6, 2, 9, 4] },
+  { name: 'Aadd9', pcs: [9, 4, 1, 11, 6] },
+  { name: 'D6/9', pcs: [2, 9, 6, 11, 4] },
+  { name: 'G♯m7♭5', pcs: [8, 2, 11, 6, 1] },
+  { name: 'F♯m9', pcs: [6, 1, 9, 4, 8] },
+  { name: 'Esus2', pcs: [4, 11, 6, 1, 9] },
+  { name: 'Dmaj7♯11', pcs: [2, 9, 6, 1, 8] },
 ];
+const NUMERALS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI'];
 
-// Chords that share more notes are likelier to follow each other, which keeps the drift smooth.
-const NEXT = CHORDS.map((a, i) => CHORDS.map((b, j) => {
-  if (i === j) return 0;
-  const shared = a.pcs.filter(p => b.pcs.includes(p)).length;
-  return shared * shared * (b.name === 'whole-tone' ? 0.3 : 1);
-}));
+// The pulse, in seconds, and how it groups into bars.
+export const PULSE = 0.2;
+export const BAR = 12;
+// Notes are held back to the next half pulse.
+const GRID = PULSE / 2;
+// A section moves on by itself if no target cues it for this long.
+const SECTION_MAX = 40;
 
-// Energy needed to reach each symphony level.
+// Rotor speeds of the Leslie cabinet in turns per second: slow chorale and fast
+// tremolo, and how quickly the light horn and the heavy drum catch up.
+const LESLIE = { horn: [0.8, 6.8, 0.7], drum: [0.7, 5.9, 2.4] };
+// The church organ's tremulant: a deep, quick wobble of pitch (in cents) and level.
+const TREMULANT = { rate: 5.6, cents: 22, level: 0.35 };
+// The combo organ's built-in vibrato: quicker and shallower, with a little level flutter.
+const COMBO_VIBRATO = { rate: 6.6, cents: 12, level: 0.08 };
+
+// Energy needed to reach each ensemble level.
 const THRESHOLDS = [0, 1.5, 4.5, 9, 15, 22];
-export const LEVEL_NAMES = ['Tuning up', 'Solo', 'Duet', 'Quartet', 'Orchestra', 'Symphony!'];
+export const LEVEL_NAMES = ['Pulse', 'Pattern', 'Canon', 'Build-up', 'Ensemble', 'Eighteen'];
 
-
-// Every voice is something struck, plucked or knocked, since that is all a ball can do.
+// Every voice is something struck, plucked or shaken, since that is all a ball can do.
 const LEVEL = {
-  mallet: 0.55, glock: 0.3, chime: 0.28, bell: 0.3, pluck: 0.75, piano: 0.42,
-  kick: 0.9, tom: 0.6, timpani: 0.7, snare: 0.32, hihat: 0.16, crash: 0.18,
-  ride: 0.22, gong: 0.5, wood: 0.3, harp: 0.6, glass: 0.22, jingle: 0.22,
-  triangle: 0.2, crystal: 0.16, vibe: 0.4, xylo: 0.4, steelpan: 0.4, handpan: 0.5,
-  conga: 0.55, bowl: 0.3, cowbell: 0.18, kalimba: 0.45, shaker: 0.2,
-  target: 0.3, pop: 0.1, bounce: 0.35,
+  mallet: 0.55, xylo: 0.38, metallophone: 0.36, piano: 0.42, harpsichord: 0.4, shaker: 0.22,
+  pluck: 0.5, harp: 0.45, pop: 0.1, bounce: 0.35,
 };
+// Hammond drawbars: 16', 8', 4', 2 2/3', 2' and 1 1/3', as ratios and levels.
+const DRAWBARS = [[0.5, 0.45], [1, 1], [2, 0.55], [3, 0.3], [4, 0.25], [6, 0.1]];
 
 // The acoustics of the shop, in the same metres as the scene.
 const SPEED_OF_SOUND = 343;
@@ -63,12 +72,26 @@ const SURFACES = [
 
 export const mtof = m => 440 * 2 ** ((m - 69) / 12);
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+// Freezes a parameter's automation at its value at time t, so a new ramp can start there.
+const holdAt = (p, t) => {
+  if (p.cancelAndHoldAtTime) p.cancelAndHoldAtTime(t);
+  else { p.cancelScheduledValues(t); p.setValueAtTime(p.value, t); }
+};
 const smooth = (x, a, b) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 const mod = (a, n) => ((a % n) + n) % n;
 
 export class Music {
   constructor() {
     this.ctx = null;
+    this.rotor = { horn: LESLIE.horn[0], drum: LESLIE.drum[0], fastFrom: Infinity, fastUntil: 0 };
+    this.leslieAt = [-7.6, 0.85, -5.6];
+    // How each organ swells: peak level, attack and release time constants, and how
+    // many seconds the build-up from repeated strikes takes to ebb away.
+    this.tonewheel = { peak: 0.1, attack: 0.45, release: 0.7, ebb: 6 };
+    this.pipes = { peak: 0.1, attack: 0.9, release: 1.1, ebb: 6 };
+    this.churchAt = [6.6, 1.6, -4.6];
+    this.combo = { peak: 0.07, attack: 0.2, release: 0.4, ebb: 6 };
+    this.comboAt = [-8.6, 0.95, -3.0];
     this.energy = 0;
     this.muted = false;
   }
@@ -90,6 +113,15 @@ export class Music {
     comp.release.value = 0.22;
     this.bus = ctx.createGain();
     this.bus.gain.value = 2.2;
+    // The ensemble breathes: a slow swell and fade, like the clarinets and voices.
+    const breath = ctx.createGain();
+    breath.gain.value = 0.8;
+    const lung = ctx.createOscillator();
+    lung.frequency.value = 1 / 7;
+    const depth = ctx.createGain();
+    depth.gain.value = 0.2;
+    lung.connect(depth).connect(breath.gain);
+    lung.start();
     // Every voice feeds the late reverb at the same level wherever it is: the
     // diffuse field fills the room evenly while the direct sound falls away.
     this.reverbIn = ctx.createGain();
@@ -97,7 +129,7 @@ export class Music {
     const reverb = ctx.createConvolver();
     reverb.normalize = false;
     reverb.buffer = this.impulse();
-    this.bus.connect(comp);
+    this.bus.connect(breath).connect(comp);
     this.reverbIn.connect(reverb).connect(this.bus);
     this.listener = { pos: [0, 1.8, 6.7], fwd: [0, 0, -1], right: [1, 0, 0] };
     comp.connect(this.out);
@@ -110,8 +142,13 @@ export class Music {
 
     this.ks = new Map();
     this.active = 0;
-    this.current = 0;
-    this.nextChange = ctx.currentTime + 5;
+    this.t0 = ctx.currentTime + 0.05;
+    this.section = 0;
+    this.sectionStart = this.t0;
+    this.pending = null;
+    this.buildLeslie();
+    this.buildChurch();
+    this.buildCombo();
   }
 
   // Silences everything while the page is in the background and picks up again on return.
@@ -165,19 +202,28 @@ export class Music {
     }
   }
 
-  // The harmony moves on every few seconds, silently; only hits make it audible.
   chord() {
-    if (!this.ctx) return CHORDS[0];
-    const now = this.ctx.currentTime;
-    if (now >= this.nextChange) {
-      const w = NEXT[this.current];
-      let r = Math.random() * w.reduce((a, b) => a + b, 0);
-      let k = 0;
-      while ((r -= w[k]) > 0) k++;
-      this.current = k;
-      this.nextChange = now + 3.5 + Math.random() * 4.5;
+    if (!this.ctx) return CYCLE[0];
+    if (this.pending && this.ctx.currentTime >= this.pending.at) {
+      this.section = this.pending.section;
+      this.sectionStart = this.pending.at;
+      this.pending = null;
     }
-    return CHORDS[this.current];
+    return CYCLE[this.section];
+  }
+
+  get sectionName() {
+    return `${NUMERALS[this.section]} · ${CYCLE[this.section].name}`;
+  }
+
+  // The pulse count since the music started, or -1 before it has.
+  pulseIndex() {
+    return this.ctx ? Math.floor((this.ctx.currentTime - this.t0) / PULSE) : -1;
+  }
+
+  nextBarTime(after) {
+    const bars = Math.floor((after - this.t0) / (PULSE * BAR)) + 1;
+    return this.t0 + bars * PULSE * BAR;
   }
 
   // Bass notes keep to root and fifth and the middle adds the third and seventh,
@@ -228,16 +274,18 @@ export class Music {
     const midi = this.pick(lo, hi, slot, step);
     this.play(voice, midi, vel, pos);
     for (let k = 1; k < gliss; k++) {
-      this.play(voice, this.pick(lo, hi, slot, step + k), vel * (1 - 0.12 * k), pos, k * 0.055);
+      this.play(voice, this.pick(lo, hi, slot, step + k), vel * (1 - 0.12 * k), pos, k * GRID);
     }
     return midi;
   }
 
-  play(voice, midi, vel, pos, delay = 0) {
+  play(voice, midi, vel, pos, delay = 0, onGrid = true) {
     const ctx = this.ctx, lp = this.listener.pos;
     const dist = Math.max(0.3, Math.hypot(pos[0] - lp[0], pos[1] - lp[1], pos[2] - lp[2]));
-    // The voice starts once its sound has had time to cross the room.
-    const t = ctx.currentTime + 0.004 + delay + dist / SPEED_OF_SOUND;
+    let t = ctx.currentTime + 0.004 + delay;
+    // Every note waits for the next step of the pulse, then for its sound to cross the room.
+    if (onGrid) t = this.t0 + Math.ceil((t - this.t0) / GRID) * GRID;
+    t += dist / SPEED_OF_SOUND;
     const out = ctx.createGain();
     out.gain.value = (LEVEL[voice] ?? 0.3) * (0.12 + 0.88 * vel);
     const nodes = [out];
@@ -292,22 +340,291 @@ export class Music {
     return nodes;
   }
 
-  // A pleasing chime for a struck target: a quick run up the chord, brighter for a better shot.
-  targetChime(pos, power) {
+  // A fixed source in the room: a panner at `at`, the late reverb and its reflections.
+  placeSource(out, at) {
+    const ctx = this.ctx;
+    const pan = ctx.createPanner();
+    pan.panningModel = 'HRTF';
+    pan.distanceModel = 'inverse';
+    pan.refDistance = REF_DISTANCE;
+    const [x, y, z] = at;
+    if (pan.positionX) {
+      pan.positionX.value = x; pan.positionY.value = y; pan.positionZ.value = z;
+    } else {
+      pan.setPosition(x, y, z);
+    }
+    out.connect(pan).connect(this.bus);
+    out.connect(this.reverbIn);
+    const lp = this.listener.pos;
+    this.reflections(out, at, Math.hypot(x - lp[0], y - lp[1], z - lp[2]));
+  }
+
+  // The Leslie cabinet: the organ's highs go to a spinning horn, heard as a
+  // swirling pitch wobble (a delay swept by the rotation) and a pulsing level; its
+  // lows go to a slower rotating drum. It sits where the cabinet stands in the room.
+  buildLeslie() {
+    const ctx = this.ctx, L = this.leslie = {};
+    L.input = ctx.createGain();
+    const out = ctx.createGain();
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 800;
+    const sweep = ctx.createDelay(0.02);
+    sweep.delayTime.value = 0.002;
+    L.hornLfo = ctx.createOscillator();
+    L.hornLfo.frequency.value = this.rotor.horn;
+    const sweepDepth = ctx.createGain();
+    sweepDepth.gain.value = 0.0007;
+    const hornLevel = ctx.createGain();
+    hornLevel.gain.value = 0.75;
+    const hornDepth = ctx.createGain();
+    hornDepth.gain.value = 0.25;
+    L.hornLfo.connect(sweepDepth).connect(sweep.delayTime);
+    L.hornLfo.connect(hornDepth).connect(hornLevel.gain);
+    L.input.connect(hp).connect(sweep).connect(hornLevel).connect(out);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 800;
+    L.drumLfo = ctx.createOscillator();
+    L.drumLfo.frequency.value = this.rotor.drum;
+    const drumLevel = ctx.createGain();
+    drumLevel.gain.value = 0.85;
+    const drumDepth = ctx.createGain();
+    drumDepth.gain.value = 0.15;
+    L.drumLfo.connect(drumDepth).connect(drumLevel.gain);
+    L.input.connect(lp).connect(drumLevel).connect(out);
+    L.hornLfo.start();
+    L.drumLfo.start();
+    this.placeSource(out, this.leslieAt);
+  }
+
+  // The church organ's tremulant shakes the whole windchest: one slow-ish LFO
+  // wobbles every pipe's pitch and the organ's level together.
+  buildChurch() {
+    this.church = this.vibratoChain(TREMULANT, this.churchAt);
+  }
+
+  buildCombo() {
+    this.comboOut = this.vibratoChain(COMBO_VIBRATO, this.comboAt);
+  }
+
+  // An organ's output with a vibrato shared by all its notes: one LFO wobbles the
+  // level here and, through `pitch`, the tuning of every oscillator connected to it.
+  vibratoChain({ rate, cents, level }, at) {
+    const ctx = this.ctx, C = {};
+    C.input = ctx.createGain();
+    const trem = ctx.createGain();
+    trem.gain.value = 1 - level;
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = rate;
+    const levelDepth = ctx.createGain();
+    levelDepth.gain.value = level;
+    lfo.connect(levelDepth).connect(trem.gain);
+    C.pitch = ctx.createGain();
+    C.pitch.gain.value = cents;
+    lfo.connect(C.pitch);
+    lfo.start();
+    C.input.connect(trem);
+    this.placeSource(trem, at);
+    return C;
+  }
+
+
+
+  // Swells an organ. Repeated strikes build it up: each adds to a level that ebbs
+  // away between hits, and a swell already sounding on the same chord grows louder
+  // and holds on rather than starting over. `o` describes the organ; `pipes` builds
+  // the chord's oscillators into the swell's envelope. Returns when it lets go.
+  organSwell(o, start, until, chord, pipes) {
+    const ctx = this.ctx, now = ctx.currentTime;
+    o.level = Math.min(1, (o.level ?? 0) * Math.exp(-(now - (o.hitAt ?? now)) / o.ebb) + 0.3);
+    o.hitAt = now;
+    const peak = o.peak * (0.5 + o.level);
+    const v = o.voice;
+    if (v && v.chord === chord && now < v.until + 1) {
+      v.until = Math.max(v.until, until);
+      holdAt(v.env.gain, now);
+      v.env.gain.setTargetAtTime(peak, now, 0.35);
+      v.env.gain.setTargetAtTime(0, v.until, o.release);
+      for (const osc of v.oscs) osc.stop(v.until + o.release * 5);
+      return v.until;
+    }
+    if (v) {
+      holdAt(v.env.gain, start);
+      v.env.gain.setTargetAtTime(0, start, 0.5);
+      for (const osc of v.oscs) osc.stop(start + 3);
+    }
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, start);
+    env.gain.setTargetAtTime(peak, start, o.attack);
+    env.gain.setTargetAtTime(0, until, o.release);
+    const { oscs, done } = pipes(env);
+    for (const osc of oscs) {
+      osc.start(start);
+      osc.stop(until + o.release * 5);
+    }
+    oscs[0].onended = () => {
+      env.disconnect();
+      done?.();
+    };
+    o.voice = { env, oscs, chord, until };
+    return until;
+  }
+
+  // An organ chord swelling through the Leslie: the rotors spin up as it grows,
+  // giving it a rising vibrato, and wind back down as it fades.
+  swell(holdBars = 1, at) {
     if (!this.ready()) return;
-    const notes = this.notesIn(79, 100, this.chord());
-    const n = Math.min(notes.length, 3 + Math.min(power, 3));
-    for (let k = 0; k < n; k++) this.play('target', notes[k], 0.9 - 0.08 * k, pos, k * 0.07);
+    const ctx = this.ctx;
+    const start = at ?? this.t0 + Math.ceil((ctx.currentTime + 0.01 - this.t0) / PULSE) * PULSE;
+    const chord = at ? CYCLE[this.pending?.section ?? this.section] : this.chord();
+    const notes = [...this.notesIn(40, 52, chord).slice(0, 1), ...this.notesIn(57, 76, chord).slice(0, 4)];
+    const until = this.organSwell(this.tonewheel, start, start + holdBars * BAR * PULSE, chord, env => {
+      env.connect(this.leslie.input);
+      const oscs = [];
+      for (const m of notes) {
+        const f = mtof(m);
+        for (const [r, a] of DRAWBARS) {
+          if (f * r > 12000) continue;
+          const osc = ctx.createOscillator();
+          osc.frequency.value = f * r;
+          const g = ctx.createGain();
+          g.gain.value = a;
+          osc.connect(g).connect(env);
+          oscs.push(osc);
+        }
+      }
+      return { oscs };
+    });
+    const now = ctx.currentTime, spinning = now >= this.rotor.fastFrom && now < this.rotor.fastUntil;
+    if (!spinning) this.rotor.fastFrom = start;
+    this.rotor.fastUntil = Math.max(this.rotor.fastUntil, until);
+  }
+
+  // A deep, reedy church chord on a 16-foot bass, opening like a swell box and
+  // wavering with the tremulant, then closing again.
+  churchSwell(holdBars = 2) {
+    if (!this.ready()) return;
+    const ctx = this.ctx;
+    const start = this.t0 + Math.ceil((ctx.currentTime + 0.01 - this.t0) / PULSE) * PULSE;
+    const chord = this.chord();
+    const notes = [...this.notesIn(26, 38, chord).slice(0, 2), ...this.notesIn(40, 57, chord).slice(0, 4)];
+    this.organSwell(this.pipes, start, start + holdBars * BAR * PULSE, chord, env => {
+      const tone = ctx.createBiquadFilter();
+      tone.type = 'lowpass';
+      tone.frequency.value = 1300;
+      tone.Q.value = 1.1;
+      const nasal = ctx.createBiquadFilter();
+      nasal.type = 'peaking';
+      nasal.frequency.value = 750;
+      nasal.gain.value = 5;
+      env.connect(tone).connect(nasal).connect(this.church.input);
+      // Each swell takes the tremulant through its own node, so it can let go cleanly.
+      const wobble = ctx.createGain();
+      this.church.pitch.connect(wobble);
+      const oscs = [];
+      notes.forEach((m, k) => {
+        const f = mtof(m), bass = k < 2 ? 1.5 : 1;
+        // A trumpet-like reed at pitch, a softer reed an octave up and a flue bass below.
+        for (const [type, r, a] of [['sawtooth', 1, 0.75], ['square', 2, 0.1], ['triangle', 0.5, 1.2]]) {
+          const osc = ctx.createOscillator();
+          osc.type = type;
+          osc.frequency.value = f * r;
+          osc.detune.value = (Math.random() - 0.5) * 6;
+          wobble.connect(osc.detune);
+          const g = ctx.createGain();
+          g.gain.value = a * bass;
+          osc.connect(g).connect(env);
+          oscs.push(osc);
+        }
+      });
+      return {
+        oscs,
+        done: () => {
+          nasal.disconnect();
+          // Chrome may already have dropped this link once the pipes stopped.
+          try { this.church.pitch.disconnect(wobble); } catch {}
+        },
+      };
+    });
+  }
+  // A combo organ, as in Reich's Four Organs: bright square-wave reeds at 8 and 4
+  // feet over a soft 16-foot, with its own quick vibrato.
+  comboSwell(holdBars = 1) {
+    if (!this.ready()) return;
+    const ctx = this.ctx;
+    const start = this.t0 + Math.ceil((ctx.currentTime + 0.01 - this.t0) / PULSE) * PULSE;
+    const chord = this.chord();
+    const notes = this.notesIn(57, 79, chord).slice(0, 4);
+    this.organSwell(this.combo, start, start + holdBars * BAR * PULSE, chord, env => {
+      const tone = ctx.createBiquadFilter();
+      tone.type = 'lowpass';
+      tone.frequency.value = 3800;
+      const reed = ctx.createBiquadFilter();
+      reed.type = 'peaking';
+      reed.frequency.value = 1600;
+      reed.gain.value = 5;
+      env.connect(tone).connect(reed).connect(this.comboOut.input);
+      const wobble = ctx.createGain();
+      this.comboOut.pitch.connect(wobble);
+      const oscs = [];
+      for (const m of notes) {
+        for (const [type, r, a] of [['square', 1, 0.6], ['square', 2, 0.3], ['sawtooth', 0.5, 0.25]]) {
+          const osc = ctx.createOscillator();
+          osc.type = type;
+          osc.frequency.value = mtof(m) * r;
+          wobble.connect(osc.detune);
+          const g = ctx.createGain();
+          g.gain.value = a;
+          osc.connect(g).connect(env);
+          oscs.push(osc);
+        }
+      }
+      return {
+        oscs,
+        done: () => {
+          reed.disconnect();
+          // Chrome may already have dropped this link once the notes stopped.
+          try { this.comboOut.pitch.disconnect(wobble); } catch {}
+        },
+      };
+    });
+  }
+
+
+  // A struck target moves the ensemble on to the next chord at the next bar, with
+  // the Leslie organ swelling in on it. Returns false if a change is already coming.
+  cue() {
+    if (!this.ready() || this.pending) return false;
+    const next = (this.section + 1) % CYCLE.length;
+    this.pending = { section: next, at: this.nextBarTime(this.ctx.currentTime) };
+    this.swell(2, this.pending.at);
+    return true;
   }
 
   // Unpitched sounds of the balls themselves.
-  effect(voice, midi, vel, pos) {
+  effect(voice, midi, vel, pos, onGrid = false) {
     if (!this.ready() || this.active > 90) return;
-    this.play(voice, midi, vel, pos);
+    this.play(voice, midi, vel, pos, 0, onGrid);
   }
 
   update(dt) {
     this.energy *= Math.exp(-dt / 4.2);
+    // The rotors ease between their speeds with the inertia of a real cabinet.
+    const now = this.ctx?.currentTime ?? 0;
+    const fast = now >= this.rotor.fastFrom && now < this.rotor.fastUntil;
+    for (const part of ['horn', 'drum']) {
+      const [slow, quick, lag] = LESLIE[part];
+      this.rotor[part] += ((fast ? quick : slow) - this.rotor[part]) * (1 - Math.exp(-dt / lag));
+    }
+    if (!this.ctx) return;
+    this.leslie.hornLfo.frequency.setTargetAtTime(this.rotor.horn, now, 0.03);
+    this.leslie.drumLfo.frequency.setTargetAtTime(this.rotor.drum, now, 0.03);
+    this.chord();
+    // A section left alone for too long moves on quietly at the next bar.
+    if (!this.pending && this.ctx.currentTime - this.sectionStart > SECTION_MAX) {
+      this.pending = { section: (this.section + 1) % CYCLE.length, at: this.nextBarTime(this.ctx.currentTime) };
+    }
   }
 
   // --- building blocks -------------------------------------------------------
@@ -384,18 +701,6 @@ export class Music {
     return this.partials(f, t, [[1, 1, d], [3.93, 0.08 + 0.3 * v, d * 0.28], [9.2, 0.12 * v, d * 0.1]], out);
   }
 
-  v_glock(f, t, v, out) {
-    return this.partials(f, t, [[1, 1, 1.8], [2.76, 0.3 * v + 0.05, 0.5], [5.4, 0.15 * v, 0.25], [8.93, 0.08 * v, 0.12]], out);
-  }
-
-  v_chime(f, t, v, out) {
-    return this.partials(f, t, [[1, 0.8, 3.6], [2, 0.5, 2.6], [3, 0.35, 1.8], [4.2, 0.3 * v + 0.05, 1.0], [5.4, 0.2 * v, 0.6], [6.8, 0.1 * v, 0.3]], out);
-  }
-
-  v_bell(f, t, v, out) {
-    return this.partials(f, t, [[1, 1, 2.4], [2, 0.55, 1.7], [3, 0.3, 1.1], [4.16, 0.25 * v + 0.05, 0.6], [5.43, 0.15 * v, 0.35]], out);
-  }
-
   v_pluck(f, t, v, out, midi) {
     const ctx = this.ctx;
     const src = ctx.createBufferSource();
@@ -420,95 +725,35 @@ export class Music {
     return this.partials(f, t, list, out);
   }
 
-  v_kick(f, t, v, out) {
-    this.noise(t, 0.015, out, { type: 'lowpass', freq: 1800, amp: 0.5 * v });
-    return this.partials(f, t, [[1, 1, 0.5]], out, 3.5, 0.07);
-  }
-
-  v_tom(f, t, v, out) {
-    this.noise(t, 0.04, out, { type: 'bandpass', freq: 600, amp: 0.3 * v });
-    return this.partials(f, t, [[1, 1, 0.6], [1.5, 0.25, 0.15]], out, 1.7, 0.09);
-  }
-
-  v_timpani(f, t, v, out) {
-    this.noise(t, 0.06, out, { type: 'lowpass', freq: 400, amp: 0.6 * v });
-    return this.partials(f, t, [[1, 1, 1.9], [1.5, 0.4, 1.3], [1.98, 0.3, 1.0], [2.44, 0.15, 0.6]], out, 1.02, 0.12);
-  }
-
-  v_snare(f, t, v, out) {
-    this.noise(t, 0.18, out, { type: 'bandpass', freq: 2800, q: 0.6, amp: 1 });
-    this.noise(t, 0.1, out, { type: 'highpass', freq: 6000, amp: 0.4 });
-    this.partials(f, t, [[1, 0.6, 0.08], [1.6, 0.3, 0.05]], out, 1.3, 0.03);
-    return t + 0.2;
-  }
-
-  v_hihat(f, t, v, out) {
-    return this.noise(t, 0.06 + 0.05 * v, out, { type: 'highpass', freq: 7500, amp: 1 });
-  }
-
-  v_crash(f, t, v, out) {
-    const d = 1.6 + v;
-    this.noise(t, d, out, { type: 'highpass', freq: 3200, amp: 1 });
-    this.noise(t, d * 0.5, out, { type: 'bandpass', freq: 7000, q: 0.5, amp: 0.6 });
-    this.partials(f, t, [[1, 0.15, 1.2], [2.76, 0.1, 0.8]], out);
-    return t + d;
-  }
-
-  v_ride(f, t, v, out) {
-    this.noise(t, 0.9, out, { type: 'highpass', freq: 5500, amp: 0.5 });
-    return this.partials(f, t, [[1, 0.8, 1.4], [2.76, 0.35, 0.8], [5.4, 0.15, 0.4]], out);
-  }
-
-  v_gong(f, t, v, out) {
-    this.noise(t, 1.5, out, { type: 'lowpass', freq: 900, amp: 0.25, attack: 0.05 });
-    return this.partials(f, t, [
-      [0.5, 0.5, 6, 0.01], [1, 1, 5.5, 0.02], [1.5, 0.4, 4.5, 0.2], [2, 0.45, 4, 0.25],
-      [2.52, 0.3, 3, 0.35], [3.1, 0.25, 2.5, 0.4], [4.2, 0.15, 1.6, 0.5],
-    ], out);
-  }
-
-  v_wood(f, t, v, out) {
-    this.noise(t, 0.01, out, { type: 'bandpass', freq: f * 2, q: 2, amp: 0.3 });
-    return this.partials(f, t, [[1, 1, 0.09], [2.7, 0.35, 0.04]], out);
+  // Harpsichord: a quill plucks an 8-foot string, with the 4-foot stop an octave above.
+  v_harpsichord(f, t, v, out, midi) {
+    const ctx = this.ctx;
+    this.noise(t, 0.01, out, { type: 'bandpass', freq: 3500, q: 1.2, amp: 0.3 });
+    let end = t;
+    for (const [m, a] of [[midi, 1], [midi + 12, 0.45]]) {
+      const src = ctx.createBufferSource();
+      src.buffer = this.ksBuffer(m);
+      const bright = ctx.createBiquadFilter();
+      bright.type = 'peaking';
+      bright.frequency.value = 2800;
+      bright.gain.value = 7;
+      const g = ctx.createGain();
+      g.gain.value = a;
+      src.connect(bright).connect(g).connect(out);
+      src.start(t);
+      end = Math.max(end, t + src.buffer.duration);
+    }
+    return end;
   }
 
   v_harp(f, t, v, out, midi) {
     return this.v_pluck(f, t, 0.35 + 0.4 * v, out, midi);
   }
 
-  v_glass(f, t, v, out) {
-    return this.partials(f, t, [[1, 1, 2.8, 0.004], [2, 0.15, 1.2], [3, 0.06, 0.6]], out);
-  }
-
-  v_jingle(f, t, v, out) {
-    this.noise(t, 0.25 + 0.15 * v, out, { type: 'bandpass', freq: 7500, q: 1.5, amp: 1 });
-    this.noise(t, 0.15, out, { type: 'highpass', freq: 10000, amp: 0.5 });
-    return this.partials(f, t, [[1, 0.35, 0.12]], out, 1.4, 0.03);
-  }
-
-  v_triangle(f, t, v, out) {
-    return this.partials(f, t, [[1, 1, 3], [2, 0.5, 2.2], [3, 0.45, 1.7], [4.2, 0.3, 1.0], [5.4, 0.25, 0.7], [6.8, 0.15, 0.4]], out);
-  }
-
-  v_crystal(f, t, v, out) {
-    return this.partials(f, t, [[1, 1, 1.3], [2, 0.3, 0.6], [3, 0.15, 0.3]], out);
-  }
-
-  // Motor vibraphone: long-ringing aluminium bars with the rotating-disc tremolo.
-  v_vibe(f, t, v, out) {
-    const ctx = this.ctx;
-    const d = clamp(3.2 * Math.pow(400 / f, 0.3), 1.5, 4.5);
-    const trem = ctx.createGain();
-    trem.gain.value = 0.75;
-    const lfo = ctx.createOscillator();
-    lfo.frequency.value = 5.2;
-    const depth = ctx.createGain();
-    depth.gain.value = 0.25;
-    lfo.connect(depth).connect(trem.gain);
-    lfo.start(t);
-    lfo.stop(t + d + 0.1);
-    trem.connect(out);
-    return this.partials(f, t, [[1, 1, d], [4, 0.2 * v + 0.05, d * 0.3], [10, 0.05 * v, d * 0.08]], trem);
+  // The metallophone: vibraphone bars with the motor off, ringing plain and long.
+  v_metallophone(f, t, v, out) {
+    const d = clamp(3.0 * Math.pow(400 / f, 0.3), 1.4, 4.2);
+    return this.partials(f, t, [[1, 1, d], [4, 0.2 * v + 0.05, d * 0.3], [10, 0.05 * v, d * 0.08]], out);
   }
 
   v_xylo(f, t, v, out) {
@@ -516,62 +761,9 @@ export class Music {
     return this.partials(f, t, [[1, 1, 0.28], [3, 0.35 * v + 0.1, 0.09], [6.2, 0.15 * v, 0.04]], out);
   }
 
-  // Steel pan: the octave and twelfth ring almost as strongly as the note itself.
-  v_steelpan(f, t, v, out) {
-    return this.partials(f, t, [[1, 1, 1.5], [2, 0.6, 0.9], [3, 0.28, 0.5], [4, 0.1, 0.25]], out, 1.008, 0.05);
-  }
-
-  v_handpan(f, t, v, out) {
-    this.noise(t, 0.05, out, { type: 'lowpass', freq: 400, amp: 0.3 * v });
-    return this.partials(f, t, [[1, 1, 3.2, 0.004], [2, 0.4, 2], [3, 0.15, 1.2]], out);
-  }
-
-  v_conga(f, t, v, out) {
-    this.noise(t, 0.03, out, { type: 'bandpass', freq: 1800, q: 1, amp: 0.4 * v });
-    return this.partials(f, t, [[1, 1, 0.38], [1.52, 0.18, 0.12]], out, 1.4, 0.03);
-  }
-
-  // Singing bowl: two nearly identical modes beat against each other as it rings.
-  v_bowl(f, t, v, out) {
-    return this.partials(f, t, [[1, 1, 5.5, 0.003], [1.004, 0.8, 5], [2.71, 0.35, 3], [5.1, 0.15, 1.4]], out);
-  }
-
-  v_cowbell(f, t, v, out) {
-    const ctx = this.ctx;
-    const bp = ctx.createBiquadFilter();
-    bp.type = 'bandpass';
-    bp.frequency.value = f * 2;
-    bp.Q.value = 1.2;
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(1, t + 0.002);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
-    for (const r of [1, 1.48]) {
-      const o = ctx.createOscillator();
-      o.type = 'square';
-      o.frequency.value = f * r;
-      o.connect(bp);
-      o.start(t);
-      o.stop(t + 0.37);
-    }
-    bp.connect(g).connect(out);
-    return t + 0.37;
-  }
-
-  // Kalimba tine: a sweet fundamental and a quick inharmonic ping from the tine's overtone.
-  v_kalimba(f, t, v, out) {
-    this.noise(t, 0.006, out, { type: 'highpass', freq: 3000, amp: 0.2 * v });
-    return this.partials(f, t, [[1, 1, 1.4], [6.9, 0.25 * v + 0.05, 0.05]], out);
-  }
-
   v_shaker(f, t, v, out) {
     this.noise(t, 0.09, out, { type: 'bandpass', freq: 5500, q: 1, amp: 1 });
     return this.noise(t + 0.07, 0.07, out, { type: 'bandpass', freq: 6000, q: 1, amp: 0.6 });
-  }
-
-  // A struck bullseye: a bright bell with a sparkle on top.
-  v_target(f, t, v, out) {
-    return this.partials(f, t, [[1, 1, 1.6], [2, 0.5, 1.0], [3, 0.3, 0.6], [4.2, 0.2, 0.3], [5.4, 0.12, 0.15]], out);
   }
 
   // The launcher's soft cork pop.

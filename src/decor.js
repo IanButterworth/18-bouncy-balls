@@ -342,7 +342,21 @@ export function buildDecor(shop) {
   wallShelves(shop, books, [-ROOM.W / 2, 0, -0.55], PI / 2, 2.2, [0.12, 0.55, 0.98, 1.41, 1.84], 2.3);
   wallShelves(shop, books, [-ROOM.W / 2, 0, -5.85], PI / 2, 1.0, [0.12, 0.62, 1.12, 1.62, 2.12, 2.62, 3.12, 3.62, 4.12, 4.62, 5.12], 5.6);
 
-  for (const [x, z, n] of [[-2.3, -5.7, 12], [2.4, -5.8, 9], [-8.9, -0.3, 14], [4.6, 2.7, 8], [-4.4, 3.0, 11], [8.8, -1.0, 10], [-1.9, 1.4, 6]]) {
+  // The shelves under the gallery and in the right-hand cabinet.
+  for (const [x0, x1] of [[-9.6, -3.4], [3.4, 9.6]]) {
+    const cx = (x0 + x1) / 2;
+    for (const y of [0.925, 2.625]) {
+      books.shelf(shop.root, x0 + 0.03, cx - 0.03, y, -7.525, 0.45, 0.32);
+      books.shelf(shop.root, cx + 0.03, x1 - 0.03, y, -7.525, 0.45, 0.3);
+    }
+  }
+  const cabinet = group(shop.root, [9.97, 0, -1.2], [0, -PI / 2, 0]);
+  cabinet.updateMatrixWorld(true);
+  const bays = [[-4.95, -1.75], [-1.65, 1.65], [1.75, 4.95]];
+  for (const [a, b] of [[-4.95, -3.1], [-2.5, -0.6], [0, 2.1], [2.7, 4.95]]) books.shelf(cabinet, a, b, 1.025, 0.6, 0.55, 0.33);
+  for (const y of [2.125, 3.225]) for (const [a, b] of bays) books.shelf(cabinet, a, b, y, 0.6, 0.55, 0.33);
+
+  for (const [x, z, n] of [[-2.3, -5.7, 12], [2.4, -5.8, 9], [-8.9, -0.3, 14], [4.6, 3.5, 8], [-4.6, 3.7, 11], [8.8, -1.0, 10], [-1.5, 1.3, 6]]) {
     const hgt = books.stack(shop.root, x, 0, z, n);
     shop.box(shop.root, [0.3, hgt, 0.34], [x, hgt / 2, z], shop.silent());
   }
