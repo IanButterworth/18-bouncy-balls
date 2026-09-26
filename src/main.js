@@ -528,6 +528,28 @@ function fire(ndc, quiet) {
   if (!quiet) music.effect('pop', 70, 0.5, from.toArray());
 }
 
+// Notes rise from an organ when it plays loud, more and bigger the louder it gets.
+// The Hammond's fly from the Leslie's spinning horn, the pipe organ's from its pipe
+// tops and the combo organ's from above its keys. `boost` evens out their levels.
+const organNoteSources = [
+  { key: 'tonewheel', boost: 0, from: v => shop.leslie.horn.localToWorld(v.set(0.28, 0, 0)) },
+  { key: 'pipes', boost: 0, from: v => shop.church.node.localToWorld(v.set(Math.random() * 1.8 - 0.9, 2.5 + Math.random() * 1.2, 0.3)) },
+  { key: 'combo', boost: 5, from: v => shop.combo.node.localToWorld(v.set(Math.random() * 0.8 - 0.4, 1.05, 0)) },
+];
+
+function organNotes(dt) {
+  const loud = music.organLoudness();
+  if (!loud) return;
+  for (const o of organNoteSources) {
+    const l = clamp((loud[o.key] + o.boost + 28) / 18, 0, 1);
+    o.due = (o.due ?? 0) + dt * 9 * l * l;
+    while (o.due >= 1) {
+      o.due -= 1;
+      fx.note(o.from(new THREE.Vector3()), music.pick(60, 84, Math.random(), 0), 0.3 + 0.7 * l);
+    }
+  }
+}
+
 // --- main loop -----------------------------------------------------------------------------
 
 function resize() {
@@ -629,6 +651,7 @@ function frame(now) {
   if (music.ctx) shop.metronome.rotation.z = 0.45 * Math.sin(Math.PI * (music.ctx.currentTime - music.t0) / (2 * PULSE));
   shop.leslie.horn.rotation.y += music.rotor.horn * 2 * Math.PI * dt;
   shop.leslie.drum.rotation.y += music.rotor.drum * 2 * Math.PI * dt;
+  organNotes(dt);
   shop.update(dt);
   decor.update(dt);
   targets.update(dt);

@@ -24,7 +24,7 @@ export class Effects {
     this.camera = camera;
     this.textures = GLYPHS.map(glyphTex);
     this.notes = [];
-    for (let i = 0; i < 90; i++) {
+    for (let i = 0; i < 160; i++) {
       const mat = new THREE.SpriteMaterial({ map: this.textures[i % 4], transparent: true, depthWrite: false });
       const s = new THREE.Sprite(mat);
       s.visible = false;

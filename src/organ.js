@@ -99,7 +99,7 @@ function churchOrgan(shop, x, z, ry) {
   mesh(rbox(1.2, 0.07, 0.34, 0.02), oak, bench, [0, 0.55, 0]);
   for (const sx of [-0.52, 0.52]) mesh(box(0.05, 0.53, 0.3), oak, bench, [sx, 0.27, 0]);
   shop.box(bench, [1.2, 0.58, 0.34], [0, 0.29, 0], shop.silent());
-  shop.church = { pos: [x, 1.6, z] };
+  shop.church = { pos: [x, 1.6, z], node: g };
   const inst = shop.instrument(g, { voice: 'church', swell: 'church', wobble: 'none', glow: 0xffc070 });
   shop.box(g, [2.3, 3.2, 1.0], [0, 1.6, 0], inst);
 }
@@ -122,7 +122,7 @@ function comboOrgan(shop, x, z, ry) {
   tabs.forEach((c, i) => mesh(rbox(0.035, 0.012, 0.05, 0.004), std(c, 0.4), g, [-0.3 + i * 0.05, 0.955, -0.12]));
   mesh(box(0.34, 0.01, 0.34), m.walnut, g, [0.1, 0.06, 0.35]);
   mesh(rbox(0.1, 0.04, 0.2, 0.01), m.ebony, g, [0.1, 0.09, 0.35], [-0.25, 0, 0]);
-  shop.combo = { pos: [x, 0.95, z] };
+  shop.combo = { pos: [x, 0.95, z], node: g };
   const inst = shop.instrument(g, { voice: 'combo', swell: 'combo', wobble: 'none', glow: 0xffc070 });
   shop.box(g, [1.0, 0.16, 0.44], [0, 0.88, 0], inst);
 }

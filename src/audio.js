@@ -340,6 +340,26 @@ export class Music {
     return nodes;
   }
 
+  meter(node) {
+    const a = this.ctx.createAnalyser();
+    a.fftSize = 512;
+    node.connect(a);
+    return a;
+  }
+
+  // How loud each organ is playing right now, in dB, swells and all.
+  organLoudness() {
+    if (!this.ctx) return null;
+    this.meterBuf ??= new Float32Array(512);
+    const read = a => {
+      a.getFloatTimeDomainData(this.meterBuf);
+      let s = 0;
+      for (const v of this.meterBuf) s += v * v;
+      return 10 * Math.log10(s / this.meterBuf.length + 1e-12);
+    };
+    return { tonewheel: read(this.leslie.meter), pipes: read(this.church.meter), combo: read(this.comboOut.meter) };
+  }
+
   // A fixed source in the room: a panner at `at`, the late reverb and its reflections.
   placeSource(out, at) {
     const ctx = this.ctx;
@@ -365,6 +385,7 @@ export class Music {
   buildLeslie() {
     const ctx = this.ctx, L = this.leslie = {};
     L.input = ctx.createGain();
+    L.meter = this.meter(L.input);
     const out = ctx.createGain();
     const hp = ctx.createBiquadFilter();
     hp.type = 'highpass';
@@ -413,6 +434,7 @@ export class Music {
   vibratoChain({ rate, cents, level }, at) {
     const ctx = this.ctx, C = {};
     C.input = ctx.createGain();
+    C.meter = this.meter(C.input);
     const trem = ctx.createGain();
     trem.gain.value = 1 - level;
     const lfo = ctx.createOscillator();
