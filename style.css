@@ -245,11 +245,12 @@ button#play:hover { transform: translateY(-2px); }
 button#play:active { transform: translateY(3px); box-shadow: 0 2px 0 #7a1020; }
 
 
-/* Quiet nudges: headphones on the title card, and turning a phone sideways on
-   narrow portrait screens. */
+/* Quiet nudges on the title card, one per line: turning a portrait screen sideways,
+   and headphones. */
 .nudge { margin: 14px 0 0; font-size: 13px; opacity: 0.6; letter-spacing: 0.02em; }
+.nudge span { display: block; }
 .landscape { display: none; font-size: 13px; opacity: 0.6; letter-spacing: 0.02em; }
-.nudge .landscape { opacity: 1; }
+.nudge .landscape { opacity: 1; display: none; }
 #landscape {
   position: fixed;
   top: calc(max(10px, env(safe-area-inset-top)) + 56px);
@@ -263,9 +264,8 @@ button#play:active { transform: translateY(3px); box-shadow: 0 2px 0 #7a1020; }
   transition: opacity 1.5s ease;
 }
 #landscape.faded { opacity: 0; }
-@media (orientation: portrait) and (max-width: 640px) {
-  .landscape { display: block; }
-  .nudge .wide { display: none; }
+@media (orientation: portrait) {
+  .landscape, .nudge .landscape { display: block; }
 }
 body:has(#overlay:not(.hidden)) #landscape { display: none; }
 
