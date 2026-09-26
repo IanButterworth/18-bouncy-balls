@@ -58,7 +58,11 @@ Audio pauses while the page is in the background.
 - Each instrument a ball bounces off before the hit adds a ricochet multiplier.
 - The ensemble level, from Pulse to Eighteen, multiplies everything.
 
-## Running
+## Playing
+
+Play it at <https://ianbutterworth.github.io/18-bouncy-balls/>.
+
+## Running locally
 
 No build step. Serve the directory and open it in a browser:
 
@@ -69,6 +73,10 @@ python3 -m http.server 8765
 
 three.js and cannon-es load from jsDelivr, so the first load needs a network
 connection. All sound is synthesised in the browser with Web Audio.
+
+The site is published with GitHub Pages straight from the `main` branch; there
+is nothing to build. Google Analytics loads only on the published site: set
+`GA_ID` in `index.html` to the GA4 measurement ID.
 
 Controls: click (or tap) to launch on the next pulse, hold to build the pattern, right-click (or a second finger) to pin the second gun, `M` to mute.
 
