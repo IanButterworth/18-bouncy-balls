@@ -309,6 +309,7 @@ function handleCollision({ ball, other, impact, point }) {
     inst.last = now;
     if (inst.swell === 'church') music.churchSwell(2);
     else if (inst.swell === 'combo') music.comboSwell(1);
+    else if (inst.swell === 'leslie') music.spin(vel);
     else music.swell(1);
     music.addEnergy(vel);
     shop.hit(inst, vel);
@@ -565,6 +566,21 @@ function organNotes(dt) {
   }
 }
 
+// Turns the Leslie's rotors in step with the sound: the horn's bell points at the
+// listener just as its wobble is loudest, and the drum's opening likewise.
+function turnLeslie(dt) {
+  const { horn, drum, cabinet } = shop.leslie;
+  const turns = music.rotorTurns();
+  if (!turns) {
+    horn.rotation.y += music.rotor.horn * 2 * Math.PI * dt;
+    drum.rotation.y += music.rotor.drum * 2 * Math.PI * dt;
+    return;
+  }
+  const v = cabinet.worldToLocal(camera.position.clone()).sub(horn.position);
+  horn.rotation.y = Math.atan2(-v.z, v.x) + 2 * Math.PI * (turns.horn - 0.25);
+  drum.rotation.y = Math.atan2(v.x, v.z) + 2 * Math.PI * (turns.drum - 0.25);
+}
+
 // --- main loop -----------------------------------------------------------------------------
 
 function resize() {
@@ -665,8 +681,7 @@ function frame(now) {
   }
 
   if (music.ctx) shop.metronome.rotation.z = 0.45 * Math.sin(Math.PI * (music.ctx.currentTime - music.t0) / (2 * PULSE));
-  shop.leslie.horn.rotation.y += music.rotor.horn * 2 * Math.PI * dt;
-  shop.leslie.drum.rotation.y += music.rotor.drum * 2 * Math.PI * dt;
+  turnLeslie(dt);
   organNotes(dt);
   shop.update(dt);
   decor.update(dt);

@@ -46,18 +46,19 @@ function leslie(shop, x, z, ry) {
     for (let y = y0; y <= y1; y += 0.06) mesh(box(W - 0.05, 0.018, 0.012), wood, g, [0, y, D / 2 - 0.005]);
   }
 
-  // The twin horn: one real, one a counterweight, spinning on a vertical shaft.
+  // The horn: one flared bell that sounds, balanced by a short capped dummy opposite,
+  // spinning on a vertical shaft.
   const horn = group(g, [0, 0.85, 0]);
   mesh(cyl(0.05, 0.05, 0.08, 16), m.ebony, horn);
-  for (const s of [-1, 1]) {
-    const bell = doubleSided(mesh(flare(0.2, 0.025, 0.07, 2.2, 20), m.ebony, horn, [s * 0.04, 0, 0], [0, 0, -s * PI / 2]));
-    bell.scale.z = 0.7;
-  }
+  const bell = doubleSided(mesh(flare(0.2, 0.025, 0.07, 2.2, 20), m.ebony, horn, [0.04, 0, 0], [0, 0, -PI / 2]));
+  bell.scale.z = 0.7;
+  mesh(cyl(0.03, 0.03, 0.1, 12), m.ebony, horn, [-0.09, 0, 0], [0, 0, PI / 2]);
+  mesh(cyl(0.035, 0.035, 0.015, 12), m.brass, horn, [-0.145, 0, 0], [0, 0, PI / 2]);
   const drum = group(g, [0, 0.31, 0]);
   mesh(cyl(0.18, 0.18, 0.2, 24), std(0x2a2019, 0.7), drum);
   mesh(box(0.2, 0.19, 0.04), std(0x8a6a4a, 0.6), drum, [0.1, 0, 0.16]);
-  shop.leslie = { horn, drum, pos: [x, 0.85, z] };
-  const inst = shop.instrument(g, { voice: 'organ', swell: true, wobble: 'none', glow: 0xffc070 });
+  shop.leslie = { horn, drum, cabinet: g, pos: [x, 0.85, z] };
+  const inst = shop.instrument(g, { voice: 'organ', swell: 'leslie', wobble: 'none', glow: 0xffc070 });
   shop.box(g, [W + 0.04, H, D + 0.04], [0, H / 2, 0], inst);
 }
 

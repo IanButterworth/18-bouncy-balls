@@ -31,8 +31,8 @@ const GRID = PULSE / 2;
 const SECTION_MAX = 40;
 
 // Rotor speeds of the Leslie cabinet in turns per second: slow chorale and fast
-// tremolo, and how quickly the light horn and the heavy drum catch up.
-const LESLIE = { horn: [0.8, 6.8, 0.7], drum: [0.7, 5.9, 2.4] };
+// tremolo, and how lazily the light horn and the heavy drum catch up, in seconds.
+const LESLIE = { horn: [0.8, 6.8, 1.2], drum: [0.7, 5.9, 3.2] };
 // The church organ's tremulant: a deep, quick wobble of pitch (in cents) and level.
 const TREMULANT = { rate: 5.6, cents: 22, level: 0.35 };
 // The combo organ's built-in vibrato: quicker and shallower, with a little level flutter.
@@ -83,7 +83,8 @@ const mod = (a, n) => ((a % n) + n) % n;
 export class Music {
   constructor() {
     this.ctx = null;
-    this.rotor = { horn: LESLIE.horn[0], drum: LESLIE.drum[0], fastFrom: Infinity, fastUntil: 0 };
+    // `spin` is how far the Leslie has been urged from chorale towards tremolo.
+    this.rotor = { horn: LESLIE.horn[0], drum: LESLIE.drum[0], spin: 0 };
     this.leslieAt = [-7.6, 0.85, -5.6];
     // How each organ swells: peak level, attack and release time constants, and how
     // many seconds the build-up from repeated strikes takes to ebb away.
@@ -394,8 +395,10 @@ export class Music {
     sweep.delayTime.value = 0.002;
     L.hornLfo = ctx.createOscillator();
     L.hornLfo.frequency.value = this.rotor.horn;
+    // The delay shortens as the horn's mouth swings towards the listener, raising the
+    // pitch a quarter turn before it faces them, as the Doppler effect does.
     const sweepDepth = ctx.createGain();
-    sweepDepth.gain.value = 0.0007;
+    sweepDepth.gain.value = -0.0007;
     const hornLevel = ctx.createGain();
     hornLevel.gain.value = 0.75;
     const hornDepth = ctx.createGain();
@@ -416,7 +419,19 @@ export class Music {
     L.input.connect(lp).connect(drumLevel).connect(out);
     L.hornLfo.start();
     L.drumLfo.start();
+    // Each rotor's phase is tracked here so the cabinet drawn on screen turns in step:
+    // the turns completed as of `at`, and the speed in force before and after `at`.
+    this.rotorPhase = { at: ctx.currentTime, horn: 0, drum: 0, before: { ...this.rotor }, after: { ...this.rotor } };
     this.placeSource(out, this.leslieAt);
+  }
+
+  // How far round each rotor is, in turns, at this moment of the audio. Zero is where
+  // its wobble starts; a quarter turn later it is loudest, facing the listener.
+  rotorTurns() {
+    if (!this.ctx) return null;
+    const R = this.rotorPhase, dt = this.ctx.currentTime - R.at;
+    const speed = dt >= 0 ? R.after : R.before;
+    return { horn: R.horn + speed.horn * dt, drum: R.drum + speed.drum * dt };
   }
 
   // The church organ's tremulant shakes the whole windchest: one slow-ish LFO
@@ -493,15 +508,15 @@ export class Music {
     return until;
   }
 
-  // An organ chord swelling through the Leslie: the rotors spin up as it grows,
-  // giving it a rising vibrato, and wind back down as it fades.
+  // An organ chord swelling in volume through the Leslie. How fast the Leslie spins
+  // is separate: that is up to strikes on the cabinet.
   swell(holdBars = 1, at) {
     if (!this.ready()) return;
     const ctx = this.ctx;
     const start = at ?? this.t0 + Math.ceil((ctx.currentTime + 0.01 - this.t0) / PULSE) * PULSE;
     const chord = at ? CYCLE[this.pending?.section ?? this.section] : this.chord();
     const notes = [...this.notesIn(40, 52, chord).slice(0, 1), ...this.notesIn(57, 76, chord).slice(0, 4)];
-    const until = this.organSwell(this.tonewheel, start, start + holdBars * BAR * PULSE, chord, env => {
+    this.organSwell(this.tonewheel, start, start + holdBars * BAR * PULSE, chord, env => {
       env.connect(this.leslie.input);
       const oscs = [];
       for (const m of notes) {
@@ -518,9 +533,12 @@ export class Music {
       }
       return { oscs };
     });
-    const now = ctx.currentTime, spinning = now >= this.rotor.fastFrom && now < this.rotor.fastUntil;
-    if (!spinning) this.rotor.fastFrom = start;
-    this.rotor.fastUntil = Math.max(this.rotor.fastUntil, until);
+  }
+
+  // Striking the Leslie cabinet urges its rotors faster; the urge builds with more
+  // strikes and ebbs away, and the rotors follow it lazily either way.
+  spin(vel) {
+    this.rotor.spin = Math.min(1, this.rotor.spin + 0.25 + 0.25 * vel);
   }
 
   // A deep, reedy church chord on a 16-foot bass, opening like a swell box and
@@ -645,16 +663,26 @@ export class Music {
 
   update(dt) {
     this.energy *= Math.exp(-dt / 4.2);
-    // The rotors ease between their speeds with the inertia of a real cabinet.
+    // The urge to spin ebbs away, and the rotors ease towards the speed it asks for
+    // with the inertia of a real cabinet.
     const now = this.ctx?.currentTime ?? 0;
-    const fast = now >= this.rotor.fastFrom && now < this.rotor.fastUntil;
+    this.rotor.spin *= Math.exp(-dt / 7);
     for (const part of ['horn', 'drum']) {
       const [slow, quick, lag] = LESLIE[part];
-      this.rotor[part] += ((fast ? quick : slow) - this.rotor[part]) * (1 - Math.exp(-dt / lag));
+      const want = slow + (quick - slow) * this.rotor.spin;
+      this.rotor[part] += (want - this.rotor[part]) * (1 - Math.exp(-dt / lag));
     }
     if (!this.ctx) return;
-    this.leslie.hornLfo.frequency.setTargetAtTime(this.rotor.horn, now, 0.03);
-    this.leslie.drumLfo.frequency.setTargetAtTime(this.rotor.drum, now, 0.03);
+    // Speed changes are scheduled slightly ahead, so the moment each takes effect in
+    // the audio is known exactly and the phase kept here matches the sound.
+    const R = this.rotorPhase, at = now + 0.03;
+    for (const part of ['horn', 'drum']) {
+      R[part] = (R[part] + R.after[part] * (at - R.at)) % 1;
+      this.leslie[part + 'Lfo'].frequency.setValueAtTime(this.rotor[part], at);
+    }
+    R.before = R.after;
+    R.after = { horn: this.rotor.horn, drum: this.rotor.drum };
+    R.at = at;
     this.chord();
     // A section left alone for too long moves on quietly at the next bar.
     if (!this.pending && this.ctx.currentTime - this.sectionStart > SECTION_MAX) {
