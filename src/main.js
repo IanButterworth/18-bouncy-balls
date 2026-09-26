@@ -1,8 +1,16 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { VignetteShader } from 'three/addons/shaders/VignetteShader.js';
 import { Music, LEVEL_NAMES } from './audio.js';
 import { Shop, buildShop } from './shop.js';
+import { buildDecor, SUN_DIR } from './decor.js';
+import { buildPercussion } from './percussion.js';
 import { Targets } from './targets.js';
 import { Effects } from './effects.js';
 
@@ -12,7 +20,18 @@ const BALL_SPEED = 15;
 const BALL_LIFE = 24;
 const MAX_BALLS = 60;
 const GRAVITY = 9;
-const FIRE_INTERVAL = 0.13;
+// Held fire follows the rhythm of lilting 6/8 phrases, like a barcarolle. Each entry
+// is [length in sixteenths, melody step]; a null step is a breath with no ball.
+const SIXTEENTH = 0.11;
+const PHRASES = [
+  [[2, 0], [1, 1], [1, 2], [2, 4], [2, 3], [4, 2]],
+  [[3, 4], [1, 3], [2, 2], [2, 1], [2, 2], [2, null]],
+  [[1, 0], [1, 1], [1, 2], [1, 3], [1, 4], [1, 5], [2, 4], [2, 2], [2, null]],
+  [[4, 2], [2, 4], [3, 5], [1, 4], [2, 2]],
+  [[2, 5], [2, 4], [2, 2], [2, 4], [4, 1]],
+  [[1, 6], [1, 5], [1, 4], [1, 3], [2, 2], [2, 1], [4, null]],
+  [[3, 2], [1, 3], [2, 4], [3, 6], [1, 5], [2, 4]],
+];
 const CAMERA_POS = new THREE.Vector3(0, 1.85, 6.7);
 
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
@@ -29,26 +48,51 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x1a120d);
+scene.background = new THREE.Color(0x0e0906);
+// A faint warm haze, so the back of the shop recedes into dusty lamplight.
+scene.fog = new THREE.FogExp2(0x1a110b, 0.028);
 const pmrem = new THREE.PMREMGenerator(renderer);
 scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-scene.environmentIntensity = 0.45;
+scene.environmentIntensity = 0.28;
 
 const camera = new THREE.PerspectiveCamera(58, 1, 0.05, 60);
 camera.position.copy(CAMERA_POS);
 camera.rotation.order = 'YXZ';
 scene.add(camera);
 
-scene.add(new THREE.HemisphereLight(0xfff0dc, 0x3b2a1e, 1.1));
-const sun = new THREE.DirectionalLight(0xfff0dd, 2.4);
-sun.position.set(-5, 9, 7);
-sun.target.position.set(0, 0, -2);
+scene.add(new THREE.HemisphereLight(0xffe6c8, 0x2a1a10, 0.22));
+// Cool afternoon daylight falling in through the shop windows on the left.
+const sun = new THREE.DirectionalLight(0xdfe6ff, 1.6);
+sun.target.position.set(2, 0, -1);
+sun.position.copy(sun.target.position).addScaledVector(SUN_DIR, -20);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 Object.assign(sun.shadow.camera, { left: -11, right: 11, top: 10, bottom: -10, near: 1, far: 30 });
 sun.shadow.bias = -0.0004;
 sun.shadow.normalBias = 0.02;
 scene.add(sun, sun.target);
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+// Bloom blurs through ever smaller copies of the frame, so one NaN or overflowing
+// glint from a polished surface would grow into a black square. Clamp them first.
+composer.addPass(new ShaderPass({
+  uniforms: { tDiffuse: { value: null } },
+  vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: `uniform sampler2D tDiffuse; varying vec2 vUv;
+    void main() {
+      vec4 c = texture2D(tDiffuse, vUv);
+      if (any(isnan(c.rgb)) || any(isinf(c.rgb))) c.rgb = vec3(0.0);
+      gl_FragColor = vec4(clamp(c.rgb, 0.0, 24.0), c.a);
+    }`,
+}));
+// Only the lamps, candles and daylit windows are bright enough to bloom.
+composer.addPass(new UnrealBloomPass(new THREE.Vector2(256, 256), 0.4, 0.6, 0.92));
+composer.addPass(new OutputPass());
+const vignette = new ShaderPass(VignetteShader);
+vignette.uniforms.offset.value = 1.0;
+vignette.uniforms.darkness.value = 1.25;
+composer.addPass(vignette);
 
 // --- physics -------------------------------------------------------------------------
 
@@ -71,7 +115,10 @@ for (const [other, restitution, friction] of [
 // --- the shop --------------------------------------------------------------------------
 
 const shop = new Shop(scene, world, pm);
-buildShop(shop);
+const { chair } = buildShop(shop);
+buildPercussion(shop, chair);
+const decor = buildDecor(shop);
+shop.finalize();
 const targets = new Targets(scene, world, pm);
 const fx = new Effects(scene, camera);
 const music = new Music();
@@ -161,27 +208,25 @@ function onCollide(ball, e) {
 }
 
 function handleCollision({ ball, other, impact, point }) {
-  const pan = clamp((point.x - camera.position.x) / 9, -0.9, 0.9);
   const vel = clamp(impact / 11, 0, 1);
-  if (other.ball) {
-    if (other.id < ball.body.id) return;
-    music.hit('click', 84, 98, Math.random(), 0, vel, pan);
-    return;
-  }
+  if (other.ball) return;
   if (other.target) {
     hitTarget(other.target, ball, point);
     return;
   }
+  if (other.material === pm.floor) {
+    music.effect('bounce', 43, vel, point.toArray());
+    return;
+  }
   const inst = other.inst;
-  if (!inst) return;
+  if (!inst || !inst.voice) return;
   const now = performance.now();
   if (now - inst.last < 45) return;
   inst.last = now;
   const slot = inst.slotFrom ? inst.slotFrom(point.clone()) : inst.slot;
   const step = inst.arp ? inst.hits % 3 : 0;
   inst.hits++;
-  const midi = music.hit(inst.voice, inst.lo, inst.hi, slot, step, vel, pan);
-  if (!inst.musical) return;
+  const midi = music.hit(inst.voice, inst.lo, inst.hi, slot, step, vel, point.toArray(), inst.gliss);
   ball.bounces++;
   music.addEnergy(vel);
   shop.hit(inst, vel);
@@ -215,7 +260,7 @@ function hitTarget(t, ball, point) {
   if (mult > 1) subs.push(`${LEVEL_NAMES[music.level]} ×${mult}`);
   if (playing) fx.popup(point, `+${points.toLocaleString()}`, subs.join(' · '), bank + mult > 3);
   fx.burst(point, 50 + 15 * mult);
-  music.fanfare(clamp(point.x / 9, -0.9, 0.9), bank + mult);
+  music.targetChime(point.toArray(), bank + mult);
   music.addEnergy(1);
   music.addEnergy(1);
 }
@@ -267,7 +312,23 @@ $('free').addEventListener('click', () => start('free'));
 
 const pointer = new THREE.Vector2(0, 0);
 const crosshair = $('crosshair');
-let firing = false, fireCooldown = 0;
+let firing = false;
+const melody = { phrase: null, i: 0, wait: 0 };
+
+function startFiring() {
+  if (firing) return;
+  firing = true;
+  melody.phrase = null;
+  melody.wait = 0;
+}
+
+function nextNote() {
+  if (!melody.phrase || melody.i >= melody.phrase.length) {
+    melody.phrase = PHRASES[Math.floor(Math.random() * PHRASES.length)];
+    melody.i = 0;
+  }
+  return melody.phrase[melody.i++];
+}
 
 function setPointer(e) {
   pointer.x = e.clientX / innerWidth * 2 - 1;
@@ -280,8 +341,7 @@ canvas.addEventListener('pointerdown', e => {
   if (e.button !== 0 || game.state !== 'playing') return;
   setPointer(e);
   canvas.setPointerCapture(e.pointerId);
-  firing = true;
-  fireCooldown = 0;
+  startFiring();
 });
 for (const ev of ['pointerup', 'pointercancel']) canvas.addEventListener(ev, () => { firing = false; });
 addEventListener('keydown', e => {
@@ -289,9 +349,13 @@ addEventListener('keydown', e => {
     music.setMuted(!music.muted);
     $('mute').textContent = music.muted ? '🔇' : '🔊';
   }
-  if (e.key === ' ' && game.state === 'playing') { firing = true; e.preventDefault(); }
+  if (e.key === ' ' && game.state === 'playing') { startFiring(); e.preventDefault(); }
 });
 addEventListener('keyup', e => { if (e.key === ' ') firing = false; });
+document.addEventListener('visibilitychange', () => {
+  music.setBackground(document.hidden);
+  if (document.hidden) firing = false;
+});
 $('mute').addEventListener('click', () => {
   music.setMuted(!music.muted);
   $('mute').textContent = music.muted ? '🔇' : '🔊';
@@ -314,7 +378,7 @@ function fire(ndc, quiet) {
   recoil = 1;
   if (!quiet) {
     game.fired++;
-    music.hit('pop', 72, 86, Math.random(), 0, 0.6, (pointer.x) * 0.5);
+    music.effect('pop', 70, 0.5, from.toArray());
   }
 }
 
@@ -323,6 +387,8 @@ function fire(ndc, quiet) {
 function resize() {
   const w = innerWidth, h = innerHeight;
   renderer.setSize(w, h, false);
+  composer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  composer.setSize(w, h);
   camera.aspect = w / h;
   // Keep the whole shop in view on narrow screens.
   camera.fov = w / h < 1 ? 58 + (1 - w / h) * 30 : 58;
@@ -334,6 +400,7 @@ resize();
 const meterSegs = [...document.querySelectorAll('#meter i')];
 let last = performance.now(), clock = 0, demoTimer = 1;
 const aimTarget = new THREE.Vector3();
+const camFwd = new THREE.Vector3(), camUp = new THREE.Vector3();
 
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
@@ -356,10 +423,14 @@ function frame(now) {
   camera.rotation.x += (pitch - camera.rotation.x) * Math.min(1, dt * 4);
 
   if (game.state === 'playing') {
-    fireCooldown -= dt;
-    if (firing && fireCooldown <= 0) {
-      fire(pointer);
-      fireCooldown = FIRE_INTERVAL;
+    if (firing) {
+      melody.wait -= dt;
+      while (melody.wait <= 0) {
+        const [len, step] = nextNote();
+        if (step !== null) fire(pointer);
+        // A little rubato, so it breathes like a player rather than a sequencer.
+        melody.wait += len * SIXTEENTH * (0.93 + Math.random() * 0.14);
+      }
     }
     if (game.mode === 'timed') {
       game.time -= dt;
@@ -410,11 +481,15 @@ function frame(now) {
   }
 
   shop.update(dt);
+  decor.update(dt);
   targets.update(dt);
   fx.update(dt);
+  camera.getWorldDirection(camFwd);
+  camUp.set(0, 1, 0).applyQuaternion(camera.quaternion);
+  music.setListener(camera.position.toArray(), camFwd.toArray(), camUp.toArray());
   music.update(dt);
   updateHud(dt);
-  renderer.render(scene, camera);
+  composer.render();
 }
 
 function updateHud(dt) {

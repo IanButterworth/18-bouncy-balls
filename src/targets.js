@@ -1,26 +1,28 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { ROOM } from './shop.js';
+import { ROOM, MEZZ } from './shop.js';
 
 const PI = Math.PI;
 const RADIUS = 0.3;
 
 const SPAWNS = [
   { p: [-1.8, 1.45, 1.1], type: 'post' },
-  { p: [1.9, 1.55, 1.0], type: 'post' },
-  { p: [-5.3, 2.2, -2.3], type: 'post' },
+  { p: [2.5, 1.7, 3.0], type: 'post' },
+  { p: [-5.2, 2.2, -2.2], type: 'post' },
   { p: [5.6, 2.3, -2.6], type: 'post' },
   { p: [0, 1.3, -5.9], type: 'post' },
-  { p: [-8.2, 1.5, 3.0], type: 'post' },
+  { p: [-8.2, 1.5, 3.2], type: 'post' },
   { p: [8.4, 1.6, -1.2], type: 'post' },
-  { p: [-3.4, 3.0, -1.5], type: 'hang' },
+  { p: [-6.9, MEZZ.y + 1.5, -7.1], type: 'post', floor: MEZZ.y },
+  { p: [3.6, MEZZ.y + 1.5, -7.1], type: 'post', floor: MEZZ.y },
+  { p: [-3.3, 3.0, -1.5], type: 'hang' },
   { p: [3.1, 3.4, -2.7], type: 'hang' },
   { p: [-6.6, 3.8, -4.6], type: 'hang' },
-  { p: [0, 1.9, -6.6], type: 'hang' },
-  { p: [6.7, 4.2, 0.0], type: 'hang' },
+  { p: [6.7, 4.4, 0.0], type: 'hang' },
+  { p: [-2.2, 3.7, -0.4], type: 'hang' },
   { p: [0, 1.55, -1.3], type: 'slide', range: 2.0, speed: 0.9 },
-  { p: [0, 3.2, -0.5], type: 'slide', range: 3.2, speed: 0.6 },
-  { p: [-4.2, 4.6, -6.0], type: 'slide', range: 2.2, speed: 1.1 },
+  { p: [0, 3.3, -0.5], type: 'slide', range: 3.2, speed: 0.6 },
+  { p: [-4.2, 4.6, -5.9], type: 'slide', range: 2.2, speed: 1.1 },
   { p: [4.8, 4.4, -5.6], type: 'slide', range: 1.8, speed: 1.3 },
 ];
 
@@ -105,31 +107,41 @@ export class Targets {
     holder.add(disc);
 
     if (s.type === 'post') {
-      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, s.p[1] - RADIUS), m.post);
-      post.position.y = -(s.p[1] + RADIUS) / 2;
+      const h = s.p[1] - (s.floor ?? 0);
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, h - RADIUS), m.post);
+      post.position.y = -(h + RADIUS) / 2;
       post.castShadow = true;
       root.add(post);
       const base = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.05, 24), m.rim);
-      base.position.y = -s.p[1] + 0.025;
+      base.position.y = -h + 0.025;
       root.add(base);
+    } else if (s.type === 'hang') {
+      // Hung from the ceiling on two cords, so it swings about the ceiling, not its own centre.
+      const L = ROOM.H - s.p[1];
+      holder.position.y = L;
+      disc.position.y = -L;
+      const cord = L - RADIUS * 0.6;
+      for (const sx of [-0.18, 0.18]) {
+        const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, cord), m.rope);
+        rope.position.set(sx, -cord / 2, 0);
+        holder.add(rope);
+      }
     } else {
-      const top = s.type === 'slide' ? 0.5 : ROOM.H - s.p[1];
+      const top = 0.5;
       for (const sx of [-0.18, 0.18]) {
         const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, top), m.rope);
         rope.position.set(sx, top / 2 + RADIUS * 0.6, 0);
         holder.add(rope);
       }
-      if (s.type === 'slide') {
-        const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, s.range * 2 + 1), m.rail);
-        rail.rotation.z = PI / 2;
-        rail.position.y = top + RADIUS * 0.6;
-        root.add(rail);
-        for (const sx of [-1, 1]) {
-          const h = ROOM.H - (s.p[1] + rail.position.y);
-          const drop = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, h), m.rope);
-          drop.position.set(sx * (s.range + 0.5), rail.position.y + h / 2, 0);
-          root.add(drop);
-        }
+      const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, s.range * 2 + 1), m.rail);
+      rail.rotation.z = PI / 2;
+      rail.position.y = top + RADIUS * 0.6;
+      root.add(rail);
+      for (const sx of [-1, 1]) {
+        const h = ROOM.H - (s.p[1] + rail.position.y);
+        const drop = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, h), m.rope);
+        drop.position.set(sx * (s.range + 0.5), rail.position.y + h / 2, 0);
+        root.add(drop);
       }
     }
 
@@ -137,7 +149,10 @@ export class Targets {
     body.addShape(new CANNON.Cylinder(RADIUS, RADIUS, 0.12, 16));
     const t = {
       spawn: s, root, holder, disc, body, state: 'popping', age: -delay,
-      phase: Math.random() * PI * 2, dying: 0,
+      phase: Math.random() * 10, dying: 0,
+      // A simple pendulum swings at sqrt(g / L) whatever its amplitude.
+      omega: s.type === 'hang' ? Math.sqrt(9.81 / (ROOM.H - s.p[1])) : 0,
+      swing: 0.09 + Math.random() * 0.07,
     };
     body.target = t;
     root.scale.setScalar(0.001);
@@ -177,7 +192,10 @@ export class Targets {
         if (k >= 1) t.state = 'up';
       }
       if (s.type === 'slide') t.holder.position.x = s.range * Math.sin(t.phase * s.speed);
-      if (s.type === 'hang') t.holder.rotation.z = 0.12 * Math.sin(t.phase * 1.3);
+      if (s.type === 'hang') {
+        t.holder.rotation.z = t.swing * Math.sin(t.omega * t.phase);
+        t.holder.rotation.x = t.swing * 0.3 * Math.sin(t.omega * t.phase + 1.3);
+      }
       if (t.state === 'dying') {
         t.dying += dt;
         t.holder.rotation.y += dt * 22;

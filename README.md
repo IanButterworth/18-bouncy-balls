@@ -1,13 +1,26 @@
 # Ricochet Rhapsody
 
-A 3D bouncy-ball shooting gallery set in a music shop. Launch extra-bouncy balls
-at the bullseyes hidden among drums, a grand piano, a marimba, tubular chimes,
-guitars, cellos, brass, a gong, handbells and a pipe organ.
+A 3D bouncy-ball shooting gallery set in a Belle Époque Paris music shop,
+Maison Ricochet. Launch extra-bouncy balls at the bullseyes hidden among nearly
+two hundred things a ball can make ring: a jazz drum kit, congas, a djembe,
+darbukas and a cajón; a marimba, vibraphone, xylophone and glockenspiel; steel
+pans, a handpan, singing bowls, gongs, cymbals, tubular chimes, wind chimes,
+bells, triangles, cowbells, temple blocks and tuned wine glasses; kalimbas,
+guitars, mandolins, a harp, pizzicato strings and two pianos; and crystal
+chandeliers.
 
-Every instrument plays notes from the chord that is sounding at that moment
-(the progression from Pachelbel's Canon in D), so the more things you set
-ringing, the fuller the harmony gets. Keep the shop busy and string sections,
-horns and a choir fade in underneath, from a solo up to a full symphony.
+Every sound is something a ball could really make: instruments are struck, plucked or knocked, never blown or bowed, plus a pop at launch, a soft bounce on the floor and a chime for a hit target. Each note comes from the chord
+of the moment: extended, modal harmony in the manner of Debussy and Ravel
+(maj9, m11, maj7♯11, 13sus, a whole-tone colour) that drifts to a neighbouring
+chord every few seconds, with no set progression. However many things ring at
+once, they blend into one rich chord.
+
+Sound is placed where it happens. Each note comes from the point the ball struck,
+through an HRTF panner relative to where you stand and look, quieter and duller
+with distance, and late by the time sound takes to cross the room. The walls,
+floor and ceiling each send back a first-order reflection from the source's
+mirror image, and a late reverb sized for the furnished shop (about 1.1 s) sits
+just under the direct sound. Audio pauses while the page is in the background.
 
 ## Scoring
 
@@ -33,6 +46,7 @@ Controls: click (or tap) to launch, hold for rapid fire, `M` to mute.
 
 - `src/main.js`: renderer, physics world, balls, input, game loop and HUD.
 - `src/shop.js`: the room and every instrument, each with a physics proxy.
-- `src/audio.js`: chord tracking, instrument voices and the backing layers.
+- `src/decor.js`: books, lamps, window light, dust and the rest of the clutter.
+- `src/audio.js`: the drifting harmony, the synthesised voices and the room acoustics.
 - `src/targets.js`: bullseyes on posts, ropes and sliding rails.
 - `src/effects.js`: floating notes, confetti and score popups.
