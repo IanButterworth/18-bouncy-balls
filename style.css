@@ -74,6 +74,7 @@ body:has(#overlay:not(.hidden)) #c { cursor: default; }
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: start;
+  align-content: start;
   gap: 12px;
   z-index: 4;
 }
@@ -244,10 +245,46 @@ button#play:hover { transform: translateY(-2px); }
 button#play:active { transform: translateY(3px); box-shadow: 0 2px 0 #7a1020; }
 
 
+/* Quiet nudges: headphones on the title card, and turning a phone sideways on
+   narrow portrait screens. */
+.nudge { margin: 14px 0 0; font-size: 13px; opacity: 0.6; letter-spacing: 0.02em; }
+.landscape { display: none; font-size: 13px; opacity: 0.6; letter-spacing: 0.02em; }
+.nudge .landscape { opacity: 1; }
+#landscape {
+  position: fixed;
+  top: calc(max(10px, env(safe-area-inset-top)) + 56px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  pointer-events: none;
+  color: var(--cream);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+  transition: opacity 1.5s ease;
+}
+#landscape.faded { opacity: 0; }
+@media (orientation: portrait) and (max-width: 640px) {
+  .landscape { display: block; }
+  .nudge .wide { display: none; }
+}
+body:has(#overlay:not(.hidden)) #landscape { display: none; }
+
 @media (max-width: 640px) {
-  #hud { grid-template-columns: 1fr auto; }
-  .symphony { grid-column: 1 / -1; justify-self: stretch; width: auto; padding: 6px 12px 8px; }
-  #score { font-size: 26px; }
-  #hint { font-size: 13px; }
+  /* Wrap, and stay clear of the buttons in the bottom-right corner. */
+  #hint { font-size: 13px; white-space: normal; text-align: center; max-width: calc(100vw - 150px); border-radius: 14px; }
   .popup b { font-size: 24px; }
+}
+
+/* Phones either way up: smaller score and ensemble panels. */
+@media (max-width: 640px), (max-height: 500px) {
+  #hud { padding: max(10px, env(safe-area-inset-top)) 10px 0; gap: 8px; }
+  .panel { padding: 4px 9px 5px; border-radius: 11px; border-width: 1.5px; }
+  .label { font-size: 9px; }
+  #score { font-size: 18px; }
+  .symphony { width: 150px; }
+  #mult { font-size: 14px; }
+  #meter { gap: 3px; margin: 3px 0 2px; }
+  #meter i { height: 6px; border-radius: 3px; }
+  #level { font-size: 11px; }
+  #chord { font-size: 10px; }
 }

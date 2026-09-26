@@ -49,6 +49,8 @@ const PHASE = { holdBars: 3, drift: 1 / 24 };
 const CAMERA_POS = new THREE.Vector3(0, 1.85, 6.7);
 
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+// Phones and tablets: taps instead of clicks, a second finger instead of a right-click.
+const IS_TOUCH = matchMedia('(hover: none) and (pointer: coarse)').matches;
 const $ = id => document.getElementById(id);
 
 // --- renderer and scene --------------------------------------------------------------
@@ -175,6 +177,8 @@ launcher.position.set(0.5, -0.42, -0.85);
 launcher.scale.setScalar(0.4);
 camera.add(launcher);
 const LAUNCHER_REST = launcher.position.clone();
+// How far to tilt the view up on tall screens, so the counter drops out of the bottom.
+let tiltUp = 0;
 const mouth = launcher.userData.mouth;
 
 // The second gun, held in the left hand, fires at a pinned spot.
@@ -183,19 +187,20 @@ phaser.scale.setScalar(0.4);
 const PHASER_REST = new THREE.Vector3(-0.5, -0.42, -0.85);
 phaser.position.copy(PHASER_REST);
 camera.add(phaser);
-// "right click", engraved round the top of the bell's flare, which faces the player.
+// How to use the left gun, engraved round the top of its bell's flare, which faces the player.
 {
+  const label = IS_TOUCH ? 'second finger' : 'right click';
   const c = document.createElement('canvas');
   c.width = 512;
   c.height = 160;
   const g = c.getContext('2d');
-  g.font = 'italic 600 78px Georgia, serif';
+  g.font = `italic 600 ${IS_TOUCH ? 66 : 78}px Georgia, serif`;
   g.textAlign = 'center';
   g.textBaseline = 'middle';
   g.fillStyle = 'rgba(255,236,170,0.5)';
-  g.fillText('right click', 257, 83);
+  g.fillText(label, 257, 83);
   g.fillStyle = 'rgba(60,36,10,0.9)';
-  g.fillText('right click', 256, 80);
+  g.fillText(label, 256, 80);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   // Seen from behind, the band's texture runs right to left and from the neck up
@@ -377,8 +382,20 @@ function start() {
   targets.reset();
   $('overlay').classList.add('hidden');
   $('hud').classList.remove('hidden');
+  // The portrait note fades a few seconds into play.
+  $('landscape').classList.remove('faded');
+  setTimeout(() => $('landscape').classList.add('faded'), 5000);
+  showHint(IS_TOUCH
+    ? 'Tap to launch · hold to build a pattern · a second finger pins the left gun to a spot'
+    : 'Click to launch · hold to build a pattern · right-click pins the left gun to a spot', 4500);
+}
+
+let hintTimer = 0;
+function showHint(text, ms) {
+  $('hint').textContent = text;
   $('hint').classList.add('show');
-  setTimeout(() => $('hint').classList.remove('show'), 4500);
+  clearTimeout(hintTimer);
+  hintTimer = setTimeout(() => $('hint').classList.remove('show'), ms);
 }
 
 $('play').addEventListener('click', start);
@@ -408,6 +425,11 @@ function setPin(ndc) {
   pinMark.position.copy(p);
   pinMark.lookAt(camera.position);
   pinMark.visible = true;
+  // The first time, say what just happened and how to undo it.
+  if (!pin.explained) {
+    pin.explained = true;
+    showHint(`Left gun pinned: it keeps firing here and drifts out of phase · ${IS_TOUCH ? 'tap the ring with a second finger' : 'right-click the ring'} to clear`, 5000);
+  }
 }
 
 // Steps the second gun along its own, slowly drifting pulse and fires its pattern.
@@ -593,10 +615,19 @@ function resize() {
   renderer.setSize(w, h, false);
   composer.setPixelRatio(Math.min(devicePixelRatio, 2));
   composer.setSize(w, h);
-  camera.aspect = w / h;
-  // Keep the whole shop in view on narrow screens.
-  camera.fov = w / h < 1 ? 58 + (1 - w / h) * 30 : 58;
+  const aspect = w / h;
+  camera.aspect = aspect;
+  // Keep at least 64 degrees of the shop in view across, so a tall phone screen still
+  // shows the ensemble side to side.
+  const across = 2 * Math.atan(Math.tan(32 * Math.PI / 180) / aspect) * 180 / Math.PI;
+  camera.fov = Math.min(100, Math.max(58, across));
   camera.updateProjectionMatrix();
+  tiltUp = aspect < 1 ? 0.12 : 0;
+  // Hold the two guns inside whatever part of the view the screen shows.
+  const halfH = 0.85 * Math.tan(camera.fov * Math.PI / 360), halfW = halfH * aspect;
+  const gx = Math.min(0.5, halfW * 0.62), gy = -halfH * 0.9;
+  LAUNCHER_REST.set(gx, gy, -0.85);
+  PHASER_REST.set(-gx, gy, -0.85);
 }
 addEventListener('resize', resize);
 resize();
@@ -618,10 +649,10 @@ function frame(now) {
   let yaw, pitch;
   if (game.state === 'menu') {
     yaw = Math.sin(clock * 0.15) * 0.22;
-    pitch = -0.08 + Math.sin(clock * 0.21) * 0.04;
+    pitch = -0.08 + tiltUp + Math.sin(clock * 0.21) * 0.04;
   } else {
     yaw = -pointer.x * 0.2;
-    pitch = pointer.y * 0.12 - 0.06;
+    pitch = pointer.y * 0.12 - 0.06 + tiltUp;
   }
   camera.rotation.y += (yaw - camera.rotation.y) * Math.min(1, dt * 4);
   camera.rotation.x += (pitch - camera.rotation.x) * Math.min(1, dt * 4);
