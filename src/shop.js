@@ -961,6 +961,9 @@ export function makeStringed(color, { w1 = 0.19, w2 = 0.15, L = 0.5, d = 0.1, ne
   return { g, bodyY };
 }
 
+const CELLO = { w1: 0.23, w2: 0.19, L: 0.76, d: 0.2, neck: 0.5, head: 0.17, strings: 4 };
+const BASS = { w1: 0.34, w2: 0.27, L: 1.1, d: 0.26, neck: 0.8, head: 0.22, strings: 4 };
+
 // A cello or bass standing on its endpin; the node origin is on the floor.
 function standingString(shop, x, y, z, ry, color, dims, spec) {
   const m = materials();
@@ -998,7 +1001,7 @@ function buildViolins(shop) {
     const { g, bodyY } = makeStringed(0xb65a1f, { w1: 0.1, w2: 0.085, L: 0.36, d: 0.06, neck: 0.22, head: 0.09, strings: 4, bowed: true });
     g.position.z = 0.08;
     hook.add(g);
-    const inst = shop.instrument(hook, { voice: 'pluck', lo: 67, hi: 88, slot: i / 3, wobble: 'swing', amp: 0.4, glow: 0xffa060 });
+    const inst = shop.instrument(hook, { voice: 'pizz', lo: 67, hi: 88, slot: i / 3, wobble: 'swing', amp: 0.4, glow: 0xffa060 });
     shop.box(hook, [0.24, 0.4, 0.1], [0, bodyY, 0.08], inst);
   });
 }
@@ -1186,18 +1189,23 @@ export function buildShop(shop) {
   buildHarpsichord(shop, -3.0, -2.0, 0.3);
   buildPiano(shop, 3.6, -2.2, -0.3);
   buildUpright(shop, 0, 0, -5.0);
-  const chair = buildCafeChair(shop, 1.3, 0.6, -0.5);
+  const chair = buildCafeChair(shop, 5.4, 0.4, -0.8);
+
+  // Cellos and double basses on the open floor between the marimbas and the
+  // keyboards, turned towards the counter so they are easy to hit.
+  const face = (x, z) => Math.atan2(-x, 6.7 - z);
+  for (const [x, z, bass, slot] of [[-2.2, 0.3, true, 0.3], [-1.0, 0.8, false, 0.2], [1.0, 0.8, false, 0.8], [2.2, 0.3, true, 0.7]]) {
+    standingString(shop, x, 0, z, face(x, z), bass ? 0x7a3312 : 0x9e4318, bass ? BASS : CELLO,
+      bass ? { voice: 'pizz', lo: 28, hi: 45, slot } : { voice: 'pizz', lo: 36, hi: 60, slot });
+  }
 
   buildHarp(shop, -4.3, -7.3, 0.2);
-  standingString(shop, -2.0, MEZZ.y, -7.35, 0.25, 0x7a3312,
-    { w1: 0.34, w2: 0.27, L: 1.1, d: 0.26, neck: 0.8, head: 0.22, strings: 4 },
-    { voice: 'pluck', lo: 28, hi: 50, slot: 0.3 });
-  standingString(shop, 0.3, MEZZ.y, -7.4, -0.2, 0x9e4318,
-    { w1: 0.23, w2: 0.19, L: 0.76, d: 0.2, neck: 0.5, head: 0.17, strings: 4 },
-    { voice: 'pluck', lo: 36, hi: 60, slot: 0.2 });
-  standingString(shop, 1.5, MEZZ.y, -7.4, 0.2, 0xa54a1c,
-    { w1: 0.23, w2: 0.19, L: 0.76, d: 0.2, neck: 0.5, head: 0.17, strings: 4 },
-    { voice: 'pluck', lo: 36, hi: 60, slot: 0.8 });
+  standingString(shop, -2.0, MEZZ.y, -7.35, 0.25, 0x7a3312, BASS,
+    { voice: 'pizz', lo: 28, hi: 45, slot: 0.3 });
+  standingString(shop, 0.3, MEZZ.y, -7.4, -0.2, 0x9e4318, CELLO,
+    { voice: 'pizz', lo: 36, hi: 60, slot: 0.2 });
+  standingString(shop, 1.5, MEZZ.y, -7.4, 0.2, 0xa54a1c, CELLO,
+    { voice: 'pizz', lo: 36, hi: 60, slot: 0.8 });
   buildUpright(shop, 5.4, MEZZ.y, -7.3);
   buildGuitars(shop);
   buildViolins(shop);

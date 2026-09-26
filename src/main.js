@@ -15,7 +15,6 @@ import { buildOrgan } from './organ.js';
 import { Targets } from './targets.js';
 import { Effects } from './effects.js';
 
-const ROUND_SECONDS = 90;
 const BALL_R = 0.11;
 const BALL_SPEED = 15;
 // Balls live long enough for their patterns to overlap and build, then fade so the texture turns over.
@@ -44,6 +43,9 @@ const PATTERN_START = 3;
 const OSTINATO_PULSES = [2, 8];
 // Balls a struck target drops onto the bars, one every other pulse.
 const CASCADE = 8;
+// The pinned second gun phases against the first, as in Reich's Piano Phase: it holds
+// in step for a few bars, then runs this much faster until it is a pulse ahead.
+const PHASE = { holdBars: 3, drift: 1 / 24 };
 const CAMERA_POS = new THREE.Vector3(0, 1.85, 6.7);
 
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
@@ -141,8 +143,8 @@ music.comboAt = shop.combo.pos;
 
 // --- launcher: a brass bell that follows the aim ------------------------------------------
 
-const launcher = new THREE.Group();
-{
+function makeBell() {
+  const g = new THREE.Group();
   const pts = [];
   for (let i = 0; i <= 20; i++) {
     const t = i / 20;
@@ -154,21 +156,39 @@ const launcher = new THREE.Group();
   );
   bell.rotation.x = -Math.PI / 2;
   bell.position.z = -0.1;
-  launcher.add(bell);
+  g.add(bell);
   const ring = new THREE.Mesh(
     new THREE.TorusGeometry(0.06, 0.018, 10, 24),
     new THREE.MeshStandardMaterial({ color: 0xb3202a, roughness: 0.3 }),
   );
   ring.position.z = -0.05;
-  launcher.add(ring);
+  g.add(ring);
+  const mouth = new THREE.Object3D();
+  mouth.position.z = -0.62;
+  g.add(mouth);
+  g.userData.mouth = mouth;
+  return g;
 }
+
+const launcher = makeBell();
 launcher.position.set(0.5, -0.42, -0.85);
 launcher.scale.setScalar(0.4);
 camera.add(launcher);
 const LAUNCHER_REST = launcher.position.clone();
-const mouth = new THREE.Object3D();
-mouth.position.z = -0.62;
-launcher.add(mouth);
+const mouth = launcher.userData.mouth;
+
+// The second gun, held in the left hand, fires at a pinned spot.
+const phaser = makeBell();
+phaser.scale.setScalar(0.4);
+const PHASER_REST = new THREE.Vector3(-0.5, -0.42, -0.85);
+phaser.position.copy(PHASER_REST);
+camera.add(phaser);
+const pinMark = new THREE.Mesh(
+  new THREE.TorusGeometry(0.2, 0.025, 10, 40),
+  new THREE.MeshStandardMaterial({ color: 0xffd070, emissive: 0xffb040, emissiveIntensity: 2, metalness: 0.5, roughness: 0.3 }),
+);
+pinMark.visible = false;
+scene.add(pinMark);
 
 // --- balls -------------------------------------------------------------------------------
 
@@ -276,13 +296,7 @@ function handleCollision({ ball, other, impact, point }) {
 
 // --- game state ----------------------------------------------------------------------------
 
-const game = {
-  state: 'menu', mode: 'timed', time: ROUND_SECONDS, score: 0, shown: 0,
-  hits: 0, bestBank: 0, peak: 0, fired: 0,
-};
-let best = 0;
-try { best = Number(localStorage.getItem('rr-best')) || 0; } catch {}
-$('best').textContent = best.toLocaleString();
+const game = { state: 'menu', score: 0, shown: 0 };
 
 function hitTarget(t, ball, point) {
   if (!targets.strike(t)) return;
@@ -291,11 +305,7 @@ function hitTarget(t, ball, point) {
   const mult = music.level + 1;
   const depth = Math.round(clamp(CAMERA_POS.z - point.z, 0, 14) * 8);
   const points = (100 + depth) * (1 + bank) * mult;
-  if (playing) {
-    game.score += points;
-    game.hits++;
-    game.bestBank = Math.max(game.bestBank, bank);
-  }
+  if (playing) game.score += points;
   const subs = [];
   if (bank) subs.push(`Ricochet ×${1 + bank}`);
   if (mult > 1) subs.push(`${LEVEL_NAMES[music.level]} ×${mult}`);
@@ -314,48 +324,18 @@ function hitTarget(t, ball, point) {
   music.addEnergy(1);
 }
 
-function start(mode) {
+function start() {
   music.init();
   game.state = 'playing';
-  game.mode = mode;
-  game.time = ROUND_SECONDS;
-  game.score = game.shown = game.hits = game.bestBank = game.peak = game.fired = 0;
+  game.score = game.shown = 0;
   targets.reset();
   $('overlay').classList.add('hidden');
   $('hud').classList.remove('hidden');
-  $('timer').classList.toggle('hidden', mode !== 'timed');
   $('hint').classList.add('show');
   setTimeout(() => $('hint').classList.remove('show'), 4500);
 }
 
-function finish() {
-  game.state = 'over';
-  firing = false;
-  const isBest = game.score > best;
-  if (isBest) {
-    best = game.score;
-    try { localStorage.setItem('rr-best', String(best)); } catch {}
-  }
-  setTimeout(() => {
-    $('results').innerHTML = `
-      <div class="big-score">${game.score.toLocaleString()}</div>
-      ${isBest ? '<div class="new-best">New best!</div>' : ''}
-      <dl>
-        <dt>Targets</dt><dd>${game.hits}</dd>
-        <dt>Longest ricochet</dt><dd>${game.bestBank ? `${game.bestBank} bounce${game.bestBank > 1 ? 's' : ''}` : 'none'}</dd>
-        <dt>Peak</dt><dd>${LEVEL_NAMES[game.peak]}</dd>
-        <dt>Balls launched</dt><dd>${game.fired}</dd>
-      </dl>`;
-    $('best').textContent = best.toLocaleString();
-    $('play').textContent = 'Play again';
-    $('overlay').classList.remove('hidden');
-    $('overlay').classList.add('results');
-    $('hud').classList.add('hidden');
-  }, 2200);
-}
-
-$('play').addEventListener('click', () => start('timed'));
-$('free').addEventListener('click', () => start('free'));
+$('play').addEventListener('click', start);
 
 // --- input ---------------------------------------------------------------------------------
 
@@ -364,6 +344,51 @@ const crosshair = $('crosshair');
 let firing = false, tapPending = false, lastPulse = -1, cascade = 0;
 // The gun's pattern, in build-up order, and how many of its notes are sounding.
 const gun = { order: [...SECTION_PATTERNS[0]], beats: PATTERN_START, heldBar: -99 };
+
+// The second gun's pin and its phase: how many pulses it runs ahead of the first,
+// whether it is holding there or drifting towards the next pulse, and the last
+// pulse it played.
+const pin = { at: null, lead: 0, target: 1, drifting: false, since: 0, last: -1, kick: 0 };
+
+function setPin(ndc) {
+  const p = aimPoint(ndc);
+  if (pin.at && p.distanceTo(pin.at) < 0.6) {
+    pin.at = null;
+    pinMark.visible = false;
+    return;
+  }
+  const now = (music.ctx.currentTime - music.t0) / PULSE;
+  Object.assign(pin, { at: p.clone(), lead: 0, target: 1, drifting: false, since: now, last: Math.floor(now) });
+  pinMark.position.copy(p);
+  pinMark.lookAt(camera.position);
+  pinMark.visible = true;
+}
+
+// Steps the second gun along its own, slowly drifting pulse and fires its pattern.
+function updatePhaser(dt) {
+  if (!pin.at || !music.ctx) return;
+  const main = (music.ctx.currentTime - music.t0) / PULSE;
+  if (!pin.drifting && main - pin.since > PHASE.holdBars * BAR) pin.drifting = true;
+  if (pin.drifting) {
+    pin.lead += dt / PULSE * PHASE.drift;
+    if (pin.lead >= pin.target) {
+      // A whole bar ahead is back in phase; count from there without skipping a beat.
+      if (pin.target >= BAR) pin.last -= BAR;
+      pin.lead = pin.target % BAR;
+      pin.target = pin.lead + 1;
+      pin.drifting = false;
+      pin.since = main;
+    }
+  }
+  const k = Math.floor(main + pin.lead);
+  if (k <= pin.last) return;
+  pin.last = k;
+  if (!gun.order.slice(0, Math.max(gun.beats, PATTERN_START)).includes(((k % BAR) + BAR) % BAR)) return;
+  const from = phaser.userData.mouth.getWorldPosition(new THREE.Vector3());
+  launch(from, pin.at);
+  pin.kick = 1;
+  music.effect('pop', 70, 0.5, from.toArray());
+}
 
 // A press fires on the next pulse. Holding on across bars builds the pattern up;
 // letting go for more than a bar starts it again from the first few notes.
@@ -417,14 +442,27 @@ function setPointer(e) {
   crosshair.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
 }
 
-canvas.addEventListener('pointermove', setPointer);
+let mainPointer = null;
+canvas.addEventListener('pointermove', e => { if (mainPointer === null || e.pointerId === mainPointer) setPointer(e); });
+canvas.addEventListener('contextmenu', e => e.preventDefault());
 canvas.addEventListener('pointerdown', e => {
-  if (e.button !== 0 || game.state !== 'playing') return;
+  if (game.state !== 'playing') return;
+  // Right-click, or a second finger, pins the second gun where it points.
+  if (e.button === 2 || (mainPointer !== null && e.pointerType === 'touch')) {
+    setPin(new THREE.Vector2(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1));
+    return;
+  }
+  if (e.button !== 0) return;
   setPointer(e);
+  mainPointer = e.pointerId;
   canvas.setPointerCapture(e.pointerId);
   startFiring();
 });
-for (const ev of ['pointerup', 'pointercancel']) canvas.addEventListener(ev, () => { firing = false; });
+for (const ev of ['pointerup', 'pointercancel']) canvas.addEventListener(ev, e => {
+  if (e.pointerId !== mainPointer) return;
+  mainPointer = null;
+  firing = false;
+});
 addEventListener('keydown', e => {
   if (e.key === 'm' || e.key === 'M') {
     music.setMuted(!music.muted);
@@ -457,10 +495,7 @@ function fire(ndc, quiet) {
   const from = mouth.getWorldPosition(new THREE.Vector3());
   launch(from, to);
   recoil = 1;
-  if (!quiet) {
-    game.fired++;
-    music.effect('pop', 70, 0.5, from.toArray());
-  }
+  if (!quiet) music.effect('pop', 70, 0.5, from.toArray());
 }
 
 // --- main loop -----------------------------------------------------------------------------
@@ -510,11 +545,6 @@ function frame(now) {
       for (let p = Math.max(lastPulse + 1, q - 2); p <= q; p++) onPulse(p);
       lastPulse = q;
     }
-    if (game.mode === 'timed') {
-      game.time -= dt;
-      if (game.time <= 0) { game.time = 0; finish(); }
-    }
-    game.peak = Math.max(game.peak, music.level);
   } else if (game.state === 'menu') {
     // Attract mode: lob a few silent balls around the shop.
     demoTimer -= dt;
@@ -533,6 +563,14 @@ function frame(now) {
   }
   launcher.lookAt(aimTarget);
   launcher.rotateY(Math.PI);
+  // Unpinned, the left gun rests pointing ahead and a little outwards.
+  phaser.position.copy(PHASER_REST);
+  phaser.lookAt(pin.at ?? camera.localToWorld(tmp.set(-1.5, -0.5, -8)));
+  phaser.rotateY(Math.PI);
+  phaser.translateZ(0.1 * pin.kick);
+  pin.kick *= Math.exp(-dt * 12);
+  pinMark.scale.setScalar(1 + 0.25 * pin.kick);
+  if (game.state === 'playing') updatePhaser(dt);
   recoil *= Math.exp(-dt * 12);
   launcher.position.copy(LAUNCHER_REST).addScaledVector(new THREE.Vector3(0, -0.02, 0.1), recoil);
 
@@ -578,9 +616,6 @@ function updateHud(dt) {
   game.shown += (game.score - game.shown) * Math.min(1, dt * 8);
   if (Math.abs(game.score - game.shown) < 1) game.shown = game.score;
   $('score').textContent = Math.round(game.shown).toLocaleString();
-  const t = Math.ceil(game.time);
-  $('time').textContent = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
-  $('timer').classList.toggle('urgent', game.mode === 'timed' && game.time < 10 && game.state === 'playing');
   const lv = music.level;
   meterSegs.forEach((s, i) => {
     s.classList.toggle('on', i < lv);

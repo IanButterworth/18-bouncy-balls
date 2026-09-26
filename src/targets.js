@@ -6,8 +6,8 @@ const PI = Math.PI;
 const RADIUS = 0.3;
 
 const SPAWNS = [
-  { p: [-1.5, 1.45, 1.0], type: 'post' },
-  { p: [1.5, 1.6, 1.0], type: 'post' },
+  { p: [-3.6, 1.5, 0.2], type: 'post' },
+  { p: [3.6, 1.6, 0.2], type: 'post' },
   { p: [-5.4, 2.2, -3.2], type: 'post' },
   { p: [5.0, 2.3, -3.4], type: 'post' },
   { p: [-1.8, 1.4, -4.4], type: 'post' },

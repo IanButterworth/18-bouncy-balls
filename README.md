@@ -1,10 +1,10 @@
-# Ricochet Rhapsody
+# Music for 18 Bouncy Balls
 
 A 3D bouncy-ball shooting gallery set in a Belle Époque Paris music shop,
 Maison Ricochet, and a quiet homage to Steve Reich's *Music for 18 Musicians*.
 Its ensemble fills the shop floor in an arc: three marimbas, two xylophones, a
-metallophone, three pianos, a French harpsichord and maracas, with plucked strings hanging round the
-walls. There are three organs: at the back left a tonewheel organ with its
+metallophone, three pianos, a French harpsichord and maracas, with cellos and
+double basses among them played pizzicato, and plucked strings round the walls. There are three organs: at the back left a tonewheel organ with its
 rotating Leslie cabinet, at the back right a gothic chamber pipe organ with reed
 stops, and by the left window a Farfisa-style combo organ like those of Reich's
 *Four Organs*.
@@ -22,6 +22,11 @@ The shop keeps one steady pulse, five to the second in bars of twelve.
   pattern of *Clapping Music*. When the section changes, the gun's rhythm moves
   to the new pattern gradually, one note dropping out and one coming in each
   bar, so the change arrives over several bars as it does in the piece.
+- Right-click (or tap with a second finger) to pin a second gun, held in your
+  left hand, to a spot in the shop. It keeps firing your pattern there,
+  in step at first; then, as in *Piano Phase*, it runs a touch faster until it is
+  one pulse ahead, holds, and moves ahead again, stepping through every offset
+  until it is back in phase. Right-click the pin to clear it.
 - Every note comes from something being struck in the room; only the organs
   sustain on their own once struck.
 - Hitting a target rings it once and moves the ensemble to the next chord at the
@@ -65,7 +70,7 @@ python3 -m http.server 8765
 three.js and cannon-es load from jsDelivr, so the first load needs a network
 connection. All sound is synthesised in the browser with Web Audio.
 
-Controls: click (or tap) to launch on the next pulse, hold to build the pattern, `M` to mute.
+Controls: click (or tap) to launch on the next pulse, hold to build the pattern, right-click (or a second finger) to pin the second gun, `M` to mute.
 
 ## Layout
 

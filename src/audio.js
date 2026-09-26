@@ -45,7 +45,7 @@ export const LEVEL_NAMES = ['Pulse', 'Pattern', 'Canon', 'Build-up', 'Ensemble',
 // Every voice is something struck, plucked or shaken, since that is all a ball can do.
 const LEVEL = {
   mallet: 0.55, xylo: 0.38, metallophone: 0.36, piano: 0.42, harpsichord: 0.4, shaker: 0.22,
-  pluck: 0.5, harp: 0.45, pop: 0.1, bounce: 0.35,
+  pluck: 0.5, harp: 0.45, pizz: 0.7, pop: 0.1, bounce: 0.35,
 };
 // Hammond drawbars: 16', 8', 4', 2 2/3', 2' and 1 1/3', as ratios and levels.
 const DRAWBARS = [[0.5, 0.45], [1, 1], [2, 0.55], [3, 0.3], [4, 0.25], [6, 0.1]];
@@ -693,6 +693,36 @@ export class Music {
     return buf;
   }
 
+  // A finger-plucked gut string: a soft, rounded pluck rather than a burst of noise,
+  // a three-point average that darkens the tone each pass, and a heavier loss so the
+  // note dies away like pizzicato. Cached per note.
+  pizzBuffer(midi) {
+    const key = `pizz${midi}`;
+    let buf = this.ks.get(key);
+    if (buf) return buf;
+    const ctx = this.ctx, sr = ctx.sampleRate;
+    const N = Math.max(3, Math.round(sr / mtof(midi)));
+    const len = Math.floor(sr * 2);
+    buf = ctx.createBuffer(1, len, sr);
+    const d = buf.getChannelData(0);
+    // The finger pulls the string aside at a point near the end and lets it go.
+    const at = 0.18;
+    for (let i = 0; i < N; i++) {
+      const x = i / N;
+      d[i] = (x < at ? x / at : (1 - x) / (1 - at)) - 0.5 + (Math.random() - 0.5) * 0.04;
+    }
+    // Damped so the note falls 40 dB in about this long, as a gut string does.
+    const loss = Math.exp(-4.6 / (mtof(midi) * (midi < 45 ? 1.4 : 0.9)));
+    for (let i = N; i < len; i++) {
+      d[i] = loss * (0.25 * d[i - N - 1 < 0 ? i - N : i - N - 1] + 0.5 * d[i - N] + 0.25 * d[i - N + 1]);
+    }
+    let peak = 0;
+    for (let i = 0; i < len; i++) peak = Math.max(peak, Math.abs(d[i]));
+    for (let i = 0; i < len; i++) d[i] /= peak || 1;
+    this.ks.set(key, buf);
+    return buf;
+  }
+
   // --- voices ------------------------------------------------------------------
 
   v_mallet(f, t, v, out) {
@@ -744,6 +774,32 @@ export class Music {
       end = Math.max(end, t + src.buffer.duration);
     }
     return end;
+  }
+
+  // Pizzicato cello, bass or violin: the string through a hollow wooden body, with
+  // the brightness rolled off and the soft knock of the finger on the fingerboard.
+  v_pizz(f, t, v, out, midi) {
+    const ctx = this.ctx;
+    this.noise(t, 0.035, out, { type: 'lowpass', freq: 350, amp: 0.35 * v });
+    const src = ctx.createBufferSource();
+    src.buffer = this.pizzBuffer(midi);
+    const air = ctx.createBiquadFilter();
+    air.type = 'peaking';
+    air.frequency.value = 110;
+    air.Q.value = 1.2;
+    air.gain.value = 6;
+    const wood = ctx.createBiquadFilter();
+    wood.type = 'peaking';
+    wood.frequency.value = 290;
+    wood.Q.value = 1.4;
+    wood.gain.value = 4;
+    const soft = ctx.createBiquadFilter();
+    soft.type = 'lowpass';
+    soft.frequency.value = Math.min(900 + 1500 * v + f * 2, 4000);
+    soft.Q.value = 0.5;
+    src.connect(air).connect(wood).connect(soft).connect(out);
+    src.start(t);
+    return t + src.buffer.duration;
   }
 
   v_harp(f, t, v, out, midi) {
