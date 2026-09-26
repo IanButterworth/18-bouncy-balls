@@ -387,7 +387,7 @@ $('play').addEventListener('click', start);
 
 const pointer = new THREE.Vector2(0, 0);
 const crosshair = $('crosshair');
-let firing = false, tapPending = false, lastPulse = -1, cascade = 0;
+let firing = false, lastShot = 0, lastPulse = -1, cascade = 0;
 // The gun's pattern, in build-up order, and how many of its notes are sounding.
 const gun = { order: [...SECTION_PATTERNS[0]], beats: PATTERN_START, heldBar: -99 };
 
@@ -436,12 +436,14 @@ function updatePhaser(dt) {
   music.effect('pop', 70, 0.5, from.toArray());
 }
 
-// A press fires on the next pulse. Holding on across bars builds the pattern up;
-// letting go for more than a bar starts it again from the first few notes.
+// A press fires straight away. Holding on then claps the pattern on the pulse, and
+// holding across bars builds it up; letting go for more than a bar starts it again
+// from the first few notes.
 function startFiring() {
   if (firing) return;
   firing = true;
-  tapPending = true;
+  fire(pointer);
+  lastShot = performance.now();
   const bar = Math.floor(lastPulse / BAR);
   if (bar - gun.heldBar > 1) gun.beats = PATTERN_START;
 }
@@ -477,8 +479,11 @@ function onPulse(q) {
   if (firing) {
     if (pos === 0 && gun.heldBar === bar - 1) gun.beats = Math.min(gun.order.length, gun.beats + 1);
     gun.heldBar = bar;
-    if (tapPending || gun.order.slice(0, gun.beats).includes(pos)) fire(pointer);
-    tapPending = false;
+    // A pattern note right on the heels of the press would be a double shot, so skip it.
+    if (gun.order.slice(0, gun.beats).includes(pos) && performance.now() - lastShot > 120) {
+      fire(pointer);
+      lastShot = performance.now();
+    }
   }
 }
 
