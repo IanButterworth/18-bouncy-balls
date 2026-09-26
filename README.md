@@ -1,5 +1,7 @@
 # Music for 18 Bouncy Balls
 
+[![Music for 18 Bouncy Balls](og-image.jpg)](https://ianbutterworth.github.io/18-bouncy-balls/)
+
 You're Steve Reich, you're in a vintage Paris music instrument shop, and you have a bouncy ball gun, or two.
 
 <https://ianbutterworth.github.io/18-bouncy-balls/>
