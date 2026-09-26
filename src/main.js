@@ -183,6 +183,36 @@ phaser.scale.setScalar(0.4);
 const PHASER_REST = new THREE.Vector3(-0.5, -0.42, -0.85);
 phaser.position.copy(PHASER_REST);
 camera.add(phaser);
+// "right click", engraved round the top of the bell's flare, which faces the player.
+{
+  const c = document.createElement('canvas');
+  c.width = 512;
+  c.height = 160;
+  const g = c.getContext('2d');
+  g.font = 'italic 600 78px Georgia, serif';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillStyle = 'rgba(255,236,170,0.5)';
+  g.fillText('right click', 257, 83);
+  g.fillStyle = 'rgba(60,36,10,0.9)';
+  g.fillText('right click', 256, 80);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  // Seen from behind, the band's texture runs right to left and from the neck up
+  // towards the mouth, so flip it both ways to read normally.
+  tex.flipY = false;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.repeat.x = -1;
+  const arc = 1.8;
+  // A band of cone matching the flare between 0.43 and 0.49 along the bell.
+  const band = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.085, 0.105, 0.06, 24, 1, true, Math.PI - arc / 2, arc),
+    new THREE.MeshStandardMaterial({ map: tex, transparent: true, metalness: 0.4, roughness: 0.5, depthWrite: false }),
+  );
+  band.rotation.x = Math.PI / 2;
+  band.position.z = -0.46;
+  phaser.add(band);
+}
 const pinMark = new THREE.Mesh(
   new THREE.TorusGeometry(0.2, 0.025, 10, 40),
   new THREE.MeshStandardMaterial({ color: 0xffd070, emissive: 0xffb040, emissiveIntensity: 2, metalness: 0.5, roughness: 0.3 }),
