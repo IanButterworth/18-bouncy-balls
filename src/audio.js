@@ -33,6 +33,8 @@ const SECTION_MAX = 40;
 // Rotor speeds of the Leslie cabinet in turns per second: slow chorale and fast
 // tremolo, and how lazily the light horn and the heavy drum catch up, in seconds.
 const LESLIE = { horn: [0.8, 6.8, 1.2], drum: [0.7, 5.9, 3.2] };
+// How long the church organ's own stone-church reverb rings, in seconds.
+const NAVE_RT60 = 4.5;
 // The church organ's tremulant: a deep, quick wobble of pitch (in cents) and level.
 const TREMULANT = { rate: 5.6, cents: 22, level: 0.35 };
 // The combo organ's built-in vibrato: quicker and shallower, with a little level flutter.
@@ -89,7 +91,7 @@ export class Music {
     // How each organ swells: peak level, attack and release time constants, and how
     // many seconds the build-up from repeated strikes takes to ebb away.
     this.tonewheel = { peak: 0.1, attack: 0.45, release: 0.7, ebb: 6 };
-    this.pipes = { peak: 0.1, attack: 0.9, release: 1.1, ebb: 6 };
+    this.pipes = { peak: 0.15, attack: 0.9, release: 1.1, ebb: 6 };
     this.churchAt = [6.6, 1.6, -4.6];
     this.combo = { peak: 0.07, attack: 0.2, release: 0.4, ebb: 6 };
     this.comboAt = [-8.3, 1.05, -2.8];
@@ -167,8 +169,8 @@ export class Music {
 
   // The shop's late reverberation: decorrelated noise decaying at the room's RT60,
   // darkening as it goes, starting after the early reflections and scaled to unit energy.
-  impulse() {
-    const ctx = this.ctx, sr = ctx.sampleRate, len = Math.floor(sr * RT60 * 1.6);
+  impulse(rt = RT60) {
+    const ctx = this.ctx, sr = ctx.sampleRate, len = Math.floor(sr * rt * 1.6);
     const buf = ctx.createBuffer(2, len, sr);
     const onset = Math.floor(sr * 0.018), ramp = sr * 0.03;
     for (let ch = 0; ch < 2; ch++) {
@@ -176,9 +178,9 @@ export class Music {
       let y = 0, energy = 0;
       for (let i = onset; i < len; i++) {
         const t = i / sr;
-        const a = 0.85 - 0.6 * (t / (RT60 * 1.6));
+        const a = 0.85 - 0.6 * (t / (rt * 1.6));
         y += a * ((Math.random() * 2 - 1) - y);
-        d[i] = y * Math.exp(-6.91 * t / RT60) * Math.min(1, (i - onset) / ramp);
+        d[i] = y * Math.exp(-6.91 * t / rt) * Math.min(1, (i - onset) / ramp);
         energy += d[i] * d[i];
       }
       const k = 1 / Math.sqrt(energy);
@@ -437,7 +439,20 @@ export class Music {
   // The church organ's tremulant shakes the whole windchest: one slow-ish LFO
   // wobbles every pipe's pitch and the organ's level together.
   buildChurch() {
+    const ctx = this.ctx;
     this.church = this.vibratoChain(TREMULANT, this.churchAt);
+    // The pipes also sound into a long, stone-church tail of their own.
+    const nave = ctx.createConvolver();
+    nave.normalize = false;
+    nave.buffer = this.impulse(NAVE_RT60);
+    const send = ctx.createGain();
+    send.gain.value = 0.45;
+    this.church.out.connect(send).connect(nave).connect(this.bus);
+    // A diapason: the round, slightly bright tone of an organ's principal pipes.
+    this.church.principal = ctx.createPeriodicWave(
+      new Float32Array([0, 1, 0.45, 0.22, 0.12, 0.07, 0.04, 0.02]),
+      new Float32Array(8),
+    );
   }
 
   buildCombo() {
@@ -463,6 +478,7 @@ export class Music {
     lfo.start();
     C.input.connect(trem);
     this.placeSource(trem, at);
+    C.out = trem;
     return C;
   }
 
@@ -541,34 +557,37 @@ export class Music {
     this.rotor.spin = Math.min(1, this.rotor.spin + 0.25 + 0.25 * vel);
   }
 
-  // A deep, reedy church chord on a 16-foot bass, opening like a swell box and
-  // wavering with the tremulant, then closing again.
+  // A church chord: a principal chorus of flue pipes (8-foot, octave, twelfth,
+  // fifteenth and a little mixture) over a 16-foot bass, tinted with a quiet reed,
+  // opening like a swell box and wavering with the tremulant, then closing again.
   churchSwell(holdBars = 2) {
     if (!this.ready()) return;
     const ctx = this.ctx;
     const start = this.t0 + Math.ceil((ctx.currentTime + 0.01 - this.t0) / PULSE) * PULSE;
     const chord = this.chord();
-    const notes = [...this.notesIn(26, 38, chord).slice(0, 2), ...this.notesIn(40, 57, chord).slice(0, 4)];
+    const notes = [...this.notesIn(26, 38, chord).slice(0, 2), ...this.notesIn(43, 64, chord).slice(0, 4)];
+    const fresh = !this.pipes.voice || this.pipes.voice.chord !== chord || ctx.currentTime > this.pipes.voice.until + 1;
     this.organSwell(this.pipes, start, start + holdBars * BAR * PULSE, chord, env => {
       const tone = ctx.createBiquadFilter();
       tone.type = 'lowpass';
-      tone.frequency.value = 1300;
-      tone.Q.value = 1.1;
-      const nasal = ctx.createBiquadFilter();
-      nasal.type = 'peaking';
-      nasal.frequency.value = 750;
-      nasal.gain.value = 5;
-      env.connect(tone).connect(nasal).connect(this.church.input);
+      tone.frequency.value = 4500;
+      tone.Q.value = 0.6;
+      env.connect(tone).connect(this.church.input);
       // Each swell takes the tremulant through its own node, so it can let go cleanly.
       const wobble = ctx.createGain();
       this.church.pitch.connect(wobble);
       const oscs = [];
+      const ranks = [
+        [this.church.principal, 1, 0.8], [this.church.principal, 2, 0.6], [this.church.principal, 3, 0.3],
+        [this.church.principal, 4, 0.35], ['sine', 6, 0.2], ['sine', 8, 0.16], ['sawtooth', 1, 0.1], ['triangle', 0.5, 1.1],
+      ];
       notes.forEach((m, k) => {
-        const f = mtof(m), bass = k < 2 ? 1.5 : 1;
-        // A trumpet-like reed at pitch, a softer reed an octave up and a flue bass below.
-        for (const [type, r, a] of [['sawtooth', 1, 0.75], ['square', 2, 0.1], ['triangle', 0.5, 1.2]]) {
+        const f = mtof(m), bass = k < 2 ? 1.4 : 1;
+        for (const [wave, r, a] of ranks) {
+          if (f * r > 9000) continue;
           const osc = ctx.createOscillator();
-          osc.type = type;
+          if (typeof wave === 'string') osc.type = wave;
+          else osc.setPeriodicWave(wave);
           osc.frequency.value = f * r;
           osc.detune.value = (Math.random() - 0.5) * 6;
           wobble.connect(osc.detune);
@@ -581,13 +600,16 @@ export class Music {
       return {
         oscs,
         done: () => {
-          nasal.disconnect();
+          tone.disconnect();
           // Chrome may already have dropped this link once the pipes stopped.
           try { this.church.pitch.disconnect(wobble); } catch {}
         },
       };
     });
+    // Pipes starting to speak give a soft, breathy chiff.
+    if (fresh) for (const m of notes.slice(2)) this.noise(start, 0.09, this.church.input, { type: 'bandpass', freq: mtof(m) * 3, q: 4, amp: 0.02 });
   }
+
   // A combo organ, as in Reich's Four Organs: bright square-wave reeds at 8 and 4
   // feet over a soft 16-foot, with its own quick vibrato.
   comboSwell(holdBars = 1) {

@@ -12,7 +12,7 @@ Its ensemble fills the shop floor in an arc: three marimbas, two xylophones, a
 metallophone, three pianos, a French harpsichord and maracas, with cellos and
 double basses among them played pizzicato, and plucked strings round the walls.
 There are three organs: at the back left a tonewheel organ with its rotating
-Leslie cabinet, at the back right a gothic chamber pipe organ with reed stops,
+Leslie cabinet, at the back right a gothic chamber pipe organ,
 and by the left window a Farfisa-style combo organ like those of Reich's
 *Four Organs*.
 
@@ -42,7 +42,8 @@ The shop keeps one steady pulse, five to the second in bars of twelve.
   pattern, and the balls already bouncing live on for longer. Left alone, a
   section moves on by itself.
 - Striking an organ swells a chord: the tonewheel organ's through its Leslie,
-  the pipe organ's deep and reedy on a 16-foot bass with a deep tremulant, the
+  the pipe organ's a chorus of principal pipes on a 16-foot bass, wavering with a
+  deep tremulant and ringing on in a long stone-church tail, the
   combo organ's in bright square-wave reeds with a quick vibrato. Striking it
   again while it sounds builds the swell louder and holds it longer.
 - Striking the Leslie cabinet spins its horn and drum up from chorale towards
