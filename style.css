@@ -136,6 +136,24 @@ body:has(#overlay:not(.hidden)) #c { cursor: default; }
   cursor: pointer;
 }
 
+#repo {
+  position: fixed;
+  right: 16px;
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 54px);
+  z-index: 6;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 207, 63, 0.2);
+  background: var(--panel);
+  color: var(--cream);
+  display: grid;
+  place-items: center;
+  opacity: 0.55;
+  transition: opacity 0.2s;
+}
+#repo:hover, #repo:focus-visible { opacity: 1; }
+
 #hint {
   position: fixed;
   left: 50%;
