@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Ricochet Rhapsody</title>
+  <meta name="description" content="A bouncy-ball shooting gallery in a music shop where every instrument is in key.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
+      "cannon-es": "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="popups"></div>
+  <div id="crosshair"><i></i></div>
+
+  <div id="hud" class="hidden">
+    <div class="panel score">
+      <span class="label">Score</span>
+      <span id="score">0</span>
+    </div>
+    <div class="panel timer" id="timer"><span id="time">1:30</span></div>
+    <div class="panel symphony">
+      <div class="row"><span class="label">Symphony</span><b id="mult">×1</b></div>
+      <div id="meter"><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="row"><span id="level">Tuning up</span><span id="chord"></span></div>
+    </div>
+  </div>
+  <button id="mute" aria-label="Toggle sound">🔊</button>
+  <div id="hint">Click to launch · hold for rapid fire · bank shots off instruments</div>
+
+  <div id="overlay">
+    <div class="card">
+      <h1>Ricochet <span>Rhapsody</span></h1>
+      <p class="tag">A bouncy-ball shooting gallery in a music shop. Every instrument is tuned to the same tune, so the more chaos you cause, the grander it sounds.</p>
+      <div id="results"></div>
+      <ul class="how">
+        <li><b>Hit the bullseyes</b> hidden among the instruments.</li>
+        <li><b>Bank your shots.</b> Each instrument a ball bounces off before a target adds a ricochet bonus.</li>
+        <li><b>Keep the shop ringing</b> to swell from a solo to a full symphony and multiply every score.</li>
+      </ul>
+      <div class="buttons">
+        <button id="play">Play 90 s</button>
+        <button id="free" class="secondary">Free play</button>
+      </div>
+      <p class="best">Best score <span id="best">0</span> · <kbd>M</kbd> mutes · sound on!</p>
+    </div>
+  </div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
