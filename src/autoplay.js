@@ -31,17 +31,17 @@ const PULSE_SPOTS = [
 // maracas and spin up the Leslie; `peak` is how many balls the texture swells to.
 // `xylo` is the twin xylophones' figure: a chord-tone step or a rest for each pulse of the bar.
 const SECTIONS = [
-  { lead: 'marimba1', canon: 'marimba0', cell: [4, 6, 5, 8, 7], to: [4, 7, 5, 9, 8], breath: ['combo', 'pipes'], maracas: true, peak: 34, xylo: '6 9 7 . 10 8 6 . 9 11 8 .' },
-  { lead: 'piano', canon: 'harpsichord', cell: [3, 5, 7, 6], to: [3, 6, 8, 6], breath: ['pipes', 'pipes'], peak: 30, xylo: '8 6 9 . 7 10 . 8 11 9 . 7' },
+  { lead: 'marimba1', canon: 'marimba0', cell: [4, 6, 5, 8, 7], to: [4, 7, 5, 9, 8], breath: ['combo', 'tonewheel'], maracas: true, peak: 34, xylo: '6 9 7 . 10 8 6 . 9 11 8 .' },
+  { lead: 'piano', canon: 'harpsichord', cell: [3, 5, 7, 6], to: [3, 6, 8, 6], breath: ['tonewheel', 'pipes'], peak: 30, xylo: '8 6 9 . 7 10 . 8 11 9 . 7' },
   { lead: 'marimba0', canon: 'marimba2', cell: [5, 7, 6, 9, 8, 7], to: [5, 8, 6, 10, 8, 7], breath: ['combo', 'combo'], maracas: true, peak: 32, xylo: '5 7 9 7 . 10 8 . 6 9 11 .' },
-  { lead: 'marimba2', canon: 'marimba1', cell: [2, 4, 6, 5], to: [3, 5, 7, 5], breath: ['tonewheel', 'pipes'], spin: true, peak: 36, xylo: '9 . 7 10 8 . 11 9 . 7 10 .' },
-  { lead: 'metallophone', canon: 'upright', cell: [6, 8, 7, 10], to: [6, 9, 7, 11], breath: ['pipes', 'pipes'], peak: 24, xylo: '7 9 . 8 10 . 9 11 . 10 8 .' },
+  { lead: 'marimba2', canon: 'marimba1', cell: [2, 4, 6, 5], to: [3, 5, 7, 5], breath: ['tonewheel', 'combo'], spin: true, peak: 36, xylo: '9 . 7 10 8 . 11 9 . 7 10 .' },
+  { lead: 'metallophone', canon: 'upright', cell: [6, 8, 7, 10], to: [6, 9, 7, 11], breath: ['pipes', 'tonewheel'], peak: 24, xylo: '7 9 . 8 10 . 9 11 . 10 8 .' },
   { lead: 'marimba0', canon: 'piano', cell: [4, 5, 7, 6, 9], to: [5, 6, 8, 7, 10], breath: ['combo', 'tonewheel'], maracas: true, spin: true, peak: 40, xylo: '6 8 10 . 9 7 . 11 9 . 8 10' },
-  { lead: 'upright', canon: 'harpsichord', cell: [3, 6, 4, 7], to: [4, 7, 5, 8], breath: ['pipes', 'combo'], peak: 30, xylo: '10 8 . 9 7 . 11 8 . 10 9 .' },
-  { lead: 'marimba2', canon: 'metallophone', cell: [6, 8, 7, 5], to: [7, 9, 8, 6], breath: ['combo', 'combo'], maracas: true, peak: 32, xylo: '7 . 9 8 11 . 10 . 8 9 7 .' },
-  { lead: 'piano', canon: 'marimba2', cell: [2, 5, 4, 7, 6], to: [3, 6, 5, 8, 7], breath: ['pipes', 'combo'], peak: 34, xylo: '8 10 7 . 9 11 . 8 10 . 7 9' },
-  { lead: 'marimba1', canon: 'marimba0', cell: [5, 7, 9, 8], to: [6, 8, 10, 8], breath: ['tonewheel', 'pipes'], maracas: true, spin: true, peak: 38, xylo: '9 11 . 10 8 . 9 12 . 10 11 .' },
-  { lead: 'metallophone', canon: 'piano', cell: [7, 9, 8, 11], to: [7, 10, 8, 12], breath: ['pipes', 'pipes'], peak: 24, xylo: '7 9 8 . 10 9 . 11 . 8 10 .' },
+  { lead: 'upright', canon: 'harpsichord', cell: [3, 6, 4, 7], to: [4, 7, 5, 8], breath: ['tonewheel', 'combo'], peak: 30, xylo: '10 8 . 9 7 . 11 8 . 10 9 .' },
+  { lead: 'marimba2', canon: 'metallophone', cell: [6, 8, 7, 5], to: [7, 9, 8, 6], breath: ['combo', 'pipes'], maracas: true, peak: 32, xylo: '7 . 9 8 11 . 10 . 8 9 7 .' },
+  { lead: 'piano', canon: 'marimba2', cell: [2, 5, 4, 7, 6], to: [3, 6, 5, 8, 7], breath: ['tonewheel', 'combo'], peak: 34, xylo: '8 10 7 . 9 11 . 8 10 . 7 9' },
+  { lead: 'marimba1', canon: 'marimba0', cell: [5, 7, 9, 8], to: [6, 8, 10, 8], breath: ['combo', 'tonewheel'], maracas: true, spin: true, peak: 38, xylo: '9 11 . 10 8 . 9 12 . 10 11 .' },
+  { lead: 'metallophone', canon: 'piano', cell: [7, 9, 8, 11], to: [7, 10, 8, 12], breath: ['pipes', 'combo'], peak: 24, xylo: '7 9 8 . 10 9 . 11 . 8 10 .' },
 ];
 
 // The melody a section has reached by a bar: from the fourth bar, one note every two bars
@@ -81,25 +81,27 @@ export class Autoplay {
     }
   }
 
-  // The Pulses: each chord is pulsed for four bars, the pipes breathing below twice, the
-  // combo organ over them, and a shot at a target cues the next chord, as the vibraphone
-  // does. The closing Pulses thin out and the last chord is left to die away.
+  // The Pulses: each chord is pulsed for four bars, and a shot at a target cues the next
+  // chord, as the vibraphone does. The Hammond swells in with each chord, the combo organ
+  // breathes over it, and a second breath passes between the three organs from one chord
+  // to the next. The closing Pulses thin out and the last chord is left to die away.
   pulses(k0, pos, bar, closing = false) {
     const io = this.io;
     const k = Math.min(CHORDS - 1, Math.floor(k0 / PULSE_BARS));
     const b = k0 - k * PULSE_BARS, p = b * BAR + pos;
     if (bar >= LAST + PULSE_BARS) return this.fade(bar, pos);
+    // At the very start the pulse plays alone for two bars before the organs breathe in.
+    const organs = closing || k > 0 || b >= 2;
     if (p === 0) {
       io.label('Pulses');
       if (k === 0) io.cap(closing ? 18 : 16);
-      io.shoot('right', io.spot('pipes'));
     }
     if (!closing && k === 0 && pos % 2 && b < 2) io.shoot('left', io.at(...PULSE_SPOTS[(p >> 1) % PULSE_SPOTS.length], 'left'));
     const spots = closing ? (k < 7 ? 1 : 0) : 2;
     if (p === 4 && spots > 0) io.shoot('left', io.at(...PULSE_SPOTS[(2 * k) % PULSE_SPOTS.length], 'left'));
     if (p === 18 && spots > 1) io.shoot('left', io.at(...PULSE_SPOTS[(2 * k + 1) % PULSE_SPOTS.length], 'left'));
-    if (p === 12 || p === 30) io.shoot('left', io.spot('combo'));
-    if (p === 24) io.shoot('right', io.spot('pipes'));
+    if (p === 12 && organs) io.shoot('left', io.spot('combo'));
+    if (p === 24) io.shoot('right', io.spot(['pipes', 'combo', 'tonewheel'][k % 3]));
     if (p === 36 && !(closing && k === CHORDS - 1)) this.cue(bar + 1);
     if (closing && k === CHORDS - 1 && p === 0) io.cap(10);
   }
