@@ -432,6 +432,7 @@ function showHint(text, ms) {
 
 $('play').addEventListener('click', start);
 $('auto').addEventListener('click', startAuto);
+$('home').addEventListener('click', goHome);
 
 // Where Play for me aims: a bar or key of an instrument, `step` from 0 (lowest) to 12.
 // The cellos and basses hide parts of the grand piano and harpsichord from each gun,
@@ -581,6 +582,19 @@ function stopAuto() {
   for (const b of balls) b.dying = true;
   targets.reset();
   document.body.classList.remove('auto');
+  $('hud').classList.add('hidden');
+  $('overlay').classList.remove('hidden');
+}
+
+// Back to the title screen, from play or from Play for me.
+function goHome() {
+  if (game.state === 'auto') return stopAuto();
+  if (game.state !== 'playing') return;
+  game.state = 'menu';
+  firing = false;
+  unpin();
+  for (const b of balls) b.dying = true;
+  targets.reset();
   $('hud').classList.add('hidden');
   $('overlay').classList.remove('hidden');
 }

@@ -137,7 +137,7 @@ body:has(#overlay:not(.hidden)) #c { cursor: default; }
   cursor: pointer;
 }
 
-#repo, #listen {
+#repo, #listen, #home {
   position: fixed;
   right: 16px;
   bottom: calc(max(16px, env(safe-area-inset-bottom)) + 54px);
@@ -154,7 +154,9 @@ body:has(#overlay:not(.hidden)) #c { cursor: default; }
   transition: opacity 0.2s;
 }
 #listen { bottom: calc(max(16px, env(safe-area-inset-bottom)) + 108px); }
-#repo:hover, #repo:focus-visible, #listen:hover, #listen:focus-visible { opacity: 1; }
+#home { bottom: calc(max(16px, env(safe-area-inset-bottom)) + 162px); padding: 0; cursor: pointer; }
+#repo:hover, #repo:focus-visible, #listen:hover, #listen:focus-visible, #home:hover, #home:focus-visible { opacity: 1; }
+body:has(#overlay:not(.hidden)) #home { display: none; }
 
 #hint {
   position: fixed;
