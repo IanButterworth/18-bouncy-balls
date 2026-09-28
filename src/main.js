@@ -58,6 +58,8 @@ const BAND_AT = {
   right: new THREE.Vector3(1.2, 1.35, 5.2),
   left: new THREE.Vector3(-1.2, 1.35, 5.2),
 };
+// How far their mouths stand from where they turn.
+const BAND_MOUTH = 0.37;
 
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 // Phones and tablets: taps instead of clicks, a second finger instead of a right-click.
@@ -257,7 +259,7 @@ const bandGuns = {};
     const at = BAND_AT[side];
     const group = new THREE.Group();
     const bell = makeBell();
-    bell.scale.setScalar(0.6);
+    bell.scale.setScalar(BAND_MOUTH / -bell.userData.mouth.position.z);
     const post = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.03, at.y - 1.01, 12), brass);
     post.position.set(at.x, (at.y + 1.01) / 2, at.z);
     group.add(bell, post);
@@ -275,6 +277,14 @@ const ballMats = BALL_COLORS.map(c => new THREE.MeshPhysicalMaterial({ color: c,
 const balls = [];
 let colorIdx = 0;
 
+// The launch velocity that lands exactly on `to` despite gravity.
+function launchVelocity(from, to) {
+  const t = Math.max(0.12, from.distanceTo(to) / BALL_SPEED);
+  const v = to.clone().sub(from).divideScalar(t);
+  v.y += GRAVITY * t / 2;
+  return v;
+}
+
 function launch(from, to) {
   const body = new CANNON.Body({
     mass: 0.15, material: pm.ball, shape: new CANNON.Sphere(BALL_R),
@@ -282,11 +292,7 @@ function launch(from, to) {
     sleepSpeedLimit: 0.25, sleepTimeLimit: 0.6,
   });
   body.position.set(from.x, from.y, from.z);
-  // Solve for the launch velocity that lands exactly on the crosshair despite gravity.
-  const dist = from.distanceTo(to);
-  const t = Math.max(0.12, dist / BALL_SPEED);
-  const v = to.clone().sub(from).divideScalar(t);
-  v.y += GRAVITY * t / 2;
+  const v = launchVelocity(from, to);
   body.velocity.set(v.x, v.y, v.z);
   body.angularVelocity.set(rand() * 20 - 10, rand() * 20 - 10, rand() * 20 - 10);
   body.ball = true;
@@ -498,11 +504,16 @@ const aimSpots = {};
   }
 }
 
+// Fires one of Play with me's guns: the bell turns along the way the ball will leave,
+// and the ball starts at its mouth.
 function bandShoot(side, to) {
-  launch(BAND_AT[side], to);
-  bandGuns[side].look.copy(to);
-  bandGuns[side].kick = 1;
-  music.effect('pop', 70, 0.5, BAND_AT[side].toArray());
+  const g = bandGuns[side], dir = launchVelocity(BAND_AT[side], to).normalize();
+  const mouth = BAND_AT[side].clone().addScaledVector(dir, BAND_MOUTH);
+  const ball = launch(mouth, to);
+  g.look.copy(BAND_AT[side]).add(dir);
+  g.kick = 1;
+  music.effect('pop', 70, 0.5, mouth.toArray());
+  return ball;
 }
 
 // Play with me's right gun on each pulse: its fixed figure, or the pattern it builds
@@ -659,7 +670,7 @@ function advanceAuto() {
   world.step(STEP);
   for (const p of pending.splice(0)) handleCollision(p);
   const R = band.right;
-  updatePhaser(band.left, STEP, auto.step / STEPS, R.order.slice(0, Math.max(R.beats, PATTERN_START)), () => BAND_AT.left);
+  updatePhaser(band.left, STEP, auto.step / STEPS, R.order.slice(0, Math.max(R.beats, PATTERN_START)), to => bandShoot('left', to));
   updatePlayerPin(STEP, auto.step / STEPS);
   targets.update(STEP);
   ageBalls(STEP);
@@ -720,8 +731,8 @@ function unpin(pn = pin) {
 }
 
 // Steps a pinned gun along its own, slowly drifting pulse and fires, as of `main` in
-// pulses of the gun it follows, whose pattern is `pattern`. `from` says where it fires from.
-function updatePhaser(pn, dt, main, pattern, from) {
+// pulses of the gun it follows, whose pattern is `pattern`. `shoot` fires it at a point.
+function updatePhaser(pn, dt, main, pattern, shoot) {
   if (!pn.at || !music.ctx) return;
   if (!pn.drifting && main - pn.since > pn.phase.holdBars * BAR) pn.drifting = true;
   if (pn.drifting) {
@@ -746,15 +757,16 @@ function updatePhaser(pn, dt, main, pattern, from) {
     to = pn.cell ? pn.cell[pn.shots++ % pn.cell.length] : pn.at;
   }
   if (!to) return;
-  const at = from();
-  launch(at, to).phased = pn;
-  pn.kick = 1;
-  music.effect('pop', 70, 0.5, at.toArray());
+  shoot(to).phased = pn;
 }
 
 function updatePlayerPin(dt, main) {
-  updatePhaser(pin, dt, main, gun.order.slice(0, Math.max(gun.beats, PATTERN_START)),
-    () => phaser.userData.mouth.getWorldPosition(new THREE.Vector3()));
+  updatePhaser(pin, dt, main, gun.order.slice(0, Math.max(gun.beats, PATTERN_START)), to => {
+    const at = phaser.userData.mouth.getWorldPosition(new THREE.Vector3());
+    pin.kick = 1;
+    music.effect('pop', 70, 0.5, at.toArray());
+    return launch(at, to);
+  });
 }
 
 // A press fires straight away. Holding on then claps the pattern on the pulse, and
@@ -1007,18 +1019,16 @@ function frame(now) {
   if (game.state === 'playing') updatePlayerPin(dt, (music.ctx.currentTime - music.t0) / PULSE);
   recoil *= Math.exp(-dt * 12);
   launcher.position.copy(LAUNCHER_REST).addScaledVector(new THREE.Vector3(0, -0.02, 0.1), recoil);
-  // Play with me's guns turn to where they last fired, the left one to its pin.
+  // Play with me's guns point the way they last fired.
   for (const side in bandGuns) {
-    const g = bandGuns[side], pinned = side === 'left' && band.left.at;
+    const g = bandGuns[side];
     g.group.visible = game.state === 'auto';
     if (!g.group.visible) continue;
-    const kick = Math.max(g.kick, side === 'left' ? band.left.kick : 0);
     g.bell.position.copy(BAND_AT[side]);
-    g.bell.lookAt(pinned ? band.left.at : g.look);
+    g.bell.lookAt(g.look);
     g.bell.rotateY(Math.PI);
-    g.bell.translateZ(0.12 * kick);
+    g.bell.translateZ(0.12 * g.kick);
     g.kick *= Math.exp(-dt * 12);
-    if (side === 'left') band.left.kick *= Math.exp(-dt * 12);
   }
 
   for (const b of balls) {
@@ -1026,7 +1036,8 @@ function frame(now) {
     b.mesh.quaternion.copy(b.body.quaternion);
     b.squash *= Math.exp(-dt * 12);
     const s = b.squash * 0.28;
-    const scale = Math.max(0, b.fade ?? 1);
+    // A ball is wider than a gun's mouth, so it swells to full size as it leaves.
+    const scale = Math.max(0, b.fade ?? 1) * Math.min(1, 0.3 + b.age * 5);
     b.holder.scale.set(scale * (1 + s * 0.6), scale * (1 - s), scale * (1 + s * 0.6));
   }
 
