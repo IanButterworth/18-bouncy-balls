@@ -1,4 +1,4 @@
-// Play for me: a fixed score that plays the shop with both guns, after the shape of
+// Play with me: a fixed score for the shop's own two guns, after the shape of
 // Music for 18 Musicians. It opens with the Pulses, each chord of the cycle in turn
 // over a steady pulse with the organs breathing on it, gives each chord a section of
 // its own, and closes with the Pulses again before the balls fall silent one by one.
@@ -16,6 +16,15 @@ const OPEN = CHORDS * PULSE_BARS;
 const CLOSE = OPEN + CHORDS * SECTION_BARS;
 // The last chord of the closing Pulses is held while the balls fall away.
 const LAST = CLOSE + OPEN - PULSE_BARS;
+// The Pulses begin with two quick notes alone: a pair on the second and third pulse of
+// every three, as chord-tone steps. The left gun joins after a bar and slips ahead a
+// pulse every four bars, so after three it is back in unison. It starts on the central
+// marimba and branches wider: the right gun's instrument, the left's, and the bar each
+// pair moves there.
+const FIGURE = {
+  steps: '. 7 9 . 7 9 . 7 9 . 7 9', join: 1, until: 14, phase: { holdBars: 1, drift: 1 / 36 },
+  places: [['marimba1', 'marimba0', 0], ['marimba2', 'marimba0', 4], ['xylo1', 'xylo0', 8]],
+};
 
 // The keys and bars that carry the Pulses, played by the left gun, as chord-tone steps
 // from 0 (lowest) to 12.
@@ -55,8 +64,9 @@ const figure = (S, name, gun, io) => S.xylo.split(' ').map(x => x === '.' ? null
 //   shoot(gun, point)           a single shot from the 'left' or 'right' gun
 //   hold(points)                the right gun claps out its pattern on these, in turn; null lets go
 //   canon(points)               the left gun is pinned to follow on these; null unpins it
-//   duet(right, left)           both guns play a figure, a point or null for each pulse of
-//                               the bar, the left pinned and drifting; no arguments stops
+//   duet(right, left, phase)    both guns play a figure, a point or null for each pulse of
+//                               the bar, the left pinned and drifting as `phase` says, or
+//                               by default slowly; no arguments stops
 //   rest(pos)                   whether the right gun's pattern leaves this pulse of the bar free
 //   cue(bar), cascade(), cap(n) change chord at a bar, drop balls on the bars, set how many balls
 //   target(), live()            where a target stands, and how many balls are still in play
@@ -82,7 +92,9 @@ export class Autoplay {
   }
 
   // The Pulses: each chord is pulsed for four bars, and a shot at a target cues the next
-  // chord, as the vibraphone does. The Hammond swells in with each chord, the combo organ
+  // chord, as the vibraphone does. The opening Pulses start from just the two-note
+  // figure drifting in and out of phase; the pulse joins on the second chord and the
+  // organs half way through it. The Hammond swells in with each chord, the combo organ
   // breathes over it, and a second breath passes between the three organs from one chord
   // to the next. The closing Pulses thin out and the last chord is left to die away.
   pulses(k0, pos, bar, closing = false) {
@@ -90,18 +102,25 @@ export class Autoplay {
     const k = Math.min(CHORDS - 1, Math.floor(k0 / PULSE_BARS));
     const b = k0 - k * PULSE_BARS, p = b * BAR + pos;
     if (bar >= LAST + PULSE_BARS) return this.fade(bar, pos);
-    // At the very start the pulse plays alone for two bars before the organs breathe in.
-    const organs = closing || k > 0 || b >= 2;
+    const pulse = closing || k0 >= PULSE_BARS;
+    const organs = closing || k0 >= PULSE_BARS + 2;
+    if (!closing && pos === 0 && k0 <= FIGURE.until) {
+      const figure = (name, gun) => FIGURE.steps.split(' ').map(x => x === '.' ? null : io.at(name, +x, gun));
+      const [right, left] = FIGURE.places.findLast(([, , from]) => k0 >= from);
+      if (k0 === FIGURE.until) io.duet();
+      else io.duet(figure(right, 'right'), k0 >= FIGURE.join ? figure(left, 'left') : null, FIGURE.phase);
+    }
     if (p === 0) {
       io.label('Pulses');
-      if (k === 0) io.cap(closing ? 18 : 16);
+      if (k === 0) io.cap(closing ? 18 : 6);
+      if (k === 1 && !closing) io.cap(16);
     }
-    if (!closing && k === 0 && pos % 2 && b < 2) io.shoot('left', io.at(...PULSE_SPOTS[(p >> 1) % PULSE_SPOTS.length], 'left'));
-    const spots = closing ? (k < 7 ? 1 : 0) : 2;
+    if (!closing && k === 1 && pos % 2 && b < 2) io.shoot('left', io.at(...PULSE_SPOTS[(p >> 1) % PULSE_SPOTS.length], 'left'));
+    const spots = closing ? (k < 7 ? 1 : 0) : pulse ? 2 : 0;
     if (p === 4 && spots > 0) io.shoot('left', io.at(...PULSE_SPOTS[(2 * k) % PULSE_SPOTS.length], 'left'));
     if (p === 18 && spots > 1) io.shoot('left', io.at(...PULSE_SPOTS[(2 * k + 1) % PULSE_SPOTS.length], 'left'));
     if (p === 12 && organs) io.shoot('left', io.spot('combo'));
-    if (p === 24) io.shoot('right', io.spot(['pipes', 'combo', 'tonewheel'][k % 3]));
+    if (p === 24 && organs) io.shoot('right', io.spot(['pipes', 'combo', 'tonewheel'][(k + 2) % 3]));
     if (p === 36 && !(closing && k === CHORDS - 1)) this.cue(bar + 1);
     if (closing && k === CHORDS - 1 && p === 0) io.cap(10);
   }

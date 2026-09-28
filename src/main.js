@@ -47,23 +47,23 @@ const CASCADE = 8;
 // The pinned second gun phases against the first, as in Reich's Piano Phase: it holds
 // in step for a few bars, then runs this much faster until it is a pulse ahead.
 const PHASE = { holdBars: 3, drift: 1 / 24 };
-// Play for me's twin xylophones drift more slowly, lingering just out of phase.
+// Play with me's twin xylophones drift more slowly, lingering just out of phase.
 const DUET_PHASE = { holdBars: 2, drift: 1 / 60 };
 const CAMERA_POS = new THREE.Vector3(0, 1.85, 6.7);
-// Play for me steps the physics this many times a pulse, and fires from fixed points
-// near where the two guns are held.
+// Play with me steps the physics this many times a pulse. Its own two guns stand on
+// the counter, wider apart than the player's, and fire from these fixed points.
 const STEPS = 36;
 const STEP = PULSE / STEPS;
-const GUN_FROM = {
-  right: CAMERA_POS.clone().add(new THREE.Vector3(0.42, -0.45, -0.75)),
-  left: CAMERA_POS.clone().add(new THREE.Vector3(-0.42, -0.45, -0.75)),
+const BAND_AT = {
+  right: new THREE.Vector3(1.2, 1.35, 5.2),
+  left: new THREE.Vector3(-1.2, 1.35, 5.2),
 };
 
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 // Phones and tablets: taps instead of clicks, a second finger instead of a right-click.
 const IS_TOUCH = matchMedia('(hover: none) and (pointer: coarse)').matches;
 const $ = id => document.getElementById(id);
-// A small seeded generator, so Play for me makes the same choices every time.
+// A small seeded generator, so Play with me makes the same choices every time.
 const seeded = seed => () => {
   seed = (seed + 0x6d2b79f5) | 0;
   let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
@@ -150,7 +150,7 @@ for (const [other, restitution, friction] of [
 // --- the shop --------------------------------------------------------------------------
 
 // The shop's books and hooks are placed with a little randomness. Draw it from a fixed
-// seed, so the room is laid out the same way every time and Play for me always meets it.
+// seed, so the room is laid out the same way every time and Play with me always meets it.
 const random = Math.random;
 Math.random = seeded(1885);
 const shop = new Shop(scene, world, pm);
@@ -248,6 +248,24 @@ const pinMark = new THREE.Mesh(
 );
 pinMark.visible = false;
 scene.add(pinMark);
+
+// Play with me's two guns: brass bells on posts at either end of the counter.
+const bandGuns = {};
+{
+  const brass = new THREE.MeshStandardMaterial({ color: 0xe3b04b, metalness: 1, roughness: 0.3 });
+  for (const side of ['right', 'left']) {
+    const at = BAND_AT[side];
+    const group = new THREE.Group();
+    const bell = makeBell();
+    bell.scale.setScalar(0.6);
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.03, at.y - 1.01, 12), brass);
+    post.position.set(at.x, (at.y + 1.01) / 2, at.z);
+    group.add(bell, post);
+    group.visible = false;
+    scene.add(group);
+    bandGuns[side] = { group, bell, look: new THREE.Vector3(at.x * 2, 1.2, 0), kick: 0 };
+  }
+}
 
 // --- balls -------------------------------------------------------------------------------
 
@@ -363,7 +381,7 @@ function handleCollision({ ball, other, impact, point }) {
   inst.hits++;
   // Balls from the pinned gun sound on its own drifting pulse, so it is heard slipping
   // gradually out of phase rather than jumping from one step of the grid to the next.
-  const lag = ball.phased && pin.at ? pin.lead * PULSE : 0;
+  const lag = ball.phased?.at ? ball.phased.lead * PULSE : 0;
   const midi = music.hit(inst.voice, inst.lo, inst.hi, slot, step, vel, point.toArray(), inst.gliss, lag);
   ball.bounces++;
   music.addEnergy(vel);
@@ -374,9 +392,9 @@ function handleCollision({ ball, other, impact, point }) {
 // --- game state ----------------------------------------------------------------------------
 
 const game = { state: 'menu', score: 0, shown: 0 };
-// Play for me: its score, the physics step it has reached, the pulse it started on,
-// how many balls it wants in play, and where each gun is pointing.
-const auto = { score: null, step: 0, start: 0, cap: MAX_BALLS, look: new THREE.Vector3(0, 1.5, -3), leftLook: null, cell: null, figure: null, shots: 0 };
+// Play with me: its score, the physics step it has reached, the pulse it started on,
+// and how many balls it wants in play.
+const auto = { score: null, step: 0, start: 0, cap: MAX_BALLS };
 const clockMs = () => game.state === 'auto' ? auto.step * STEP * 1000 : performance.now();
 
 function hitTarget(t, ball, point) {
@@ -434,7 +452,7 @@ $('play').addEventListener('click', start);
 $('auto').addEventListener('click', startAuto);
 $('home').addEventListener('click', goHome);
 
-// Where Play for me aims: a bar or key of an instrument, `step` from 0 (lowest) to 12.
+// Where Play with me aims: a bar or key of an instrument, `step` from 0 (lowest) to 12.
 // The cellos and basses hide parts of the grand piano and harpsichord from each gun,
 // so on those each gun spreads the steps over the stretches it has a clear shot at,
 // given as ranges across the instrument in metres. Struck bars bob and maracas jiggle,
@@ -460,8 +478,8 @@ const aimSpots = {};
   for (let k = 0; k < 3; k++) aimSpots['marimba' + k] = row(mallets.slice(13 * k, 13 * k + 13));
   for (let k = 0; k < 2; k++) aimSpots['xylo' + k] = row(xylos.slice(12 * k, 12 * k + 12));
   aimSpots.metallophone = row(bars('metallophone'));
-  aimSpots.piano = keys(grand, 1.05, -0.8, { right: [[-0.05, 0.7]], left: [[-0.7, -0.25], [0.45, 0.7]] });
-  aimSpots.harpsichord = keys(harpsichord, 1.02, -0.6, { right: [[-0.42, -0.18]], left: [[-0.4, 0.3]] });
+  aimSpots.piano = keys(grand, 1.05, -0.8, { right: [[-0.4, 0.7]], left: [[-0.25, 0.4]] });
+  aimSpots.harpsichord = keys(harpsichord, 1.02, -0.9, { right: [[-0.3, 0.4]], left: [[0, 0.4]] });
   aimSpots.upright = keys(upright, 1.35, 0.05, { right: [[-0.6, 0.6]], left: [[-0.6, 0.6]] });
   aimSpots.pipes = () => organ('church').localToWorld(new THREE.Vector3(0, 1.8, 0));
   aimSpots.combo = () => organ('combo').localToWorld(new THREE.Vector3(0, 1.02, 0));
@@ -480,43 +498,54 @@ const aimSpots = {};
   }
 }
 
-function shootFrom(gun, to) {
-  launch(GUN_FROM[gun], to);
-  if (gun === 'right') {
-    auto.look.copy(to);
-    recoil = 1;
-  } else {
-    auto.leftLook = to.clone();
-    pin.kick = 1;
-  }
-  music.effect('pop', 70, 0.5, GUN_FROM[gun].toArray());
+function bandShoot(side, to) {
+  launch(BAND_AT[side], to);
+  bandGuns[side].look.copy(to);
+  bandGuns[side].kick = 1;
+  music.effect('pop', 70, 0.5, BAND_AT[side].toArray());
+}
+
+// Play with me's right gun on each pulse: its fixed figure, or the pattern it builds
+// up while it holds, on the notes of its melody in turn.
+function bandPulse(bar, pos) {
+  const R = band.right;
+  if (R.figure?.[pos]) bandShoot('right', R.figure[pos]);
+  if (!R.holding) return;
+  if (pos === 0 && R.heldBar === bar - 1) R.beats = Math.min(R.order.length, R.beats + 1);
+  R.heldBar = bar;
+  if (R.order.slice(0, R.beats).includes(pos)) bandShoot('right', R.cell[R.shots++ % R.cell.length]);
 }
 
 const autoIo = {
   at: (name, step, gun) => aimSpots[name](step, gun),
   spot: name => aimSpots[name](),
-  shoot: shootFrom,
+  shoot: bandShoot,
   hold(points) {
-    if (points && !firing) {
-      gun.beats = PATTERN_START;
-      gun.heldBar = -99;
-      auto.shots = 0;
-    }
-    firing = !!points;
-    auto.cell = points;
+    const R = band.right;
+    if (points && !R.holding) Object.assign(R, { beats: PATTERN_START, heldBar: -99, shots: 0 });
+    R.holding = !!points;
+    R.cell = points;
   },
   canon(points) {
-    if (!points) return unpin();
-    if (!pin.at) setPin(centre(points), auto.step / STEPS);
-    pin.cell = points;
+    const L = band.left;
+    if (!points) return unpin(L);
+    if (!L.at) pinAt(L, centre(points), auto.step / STEPS);
+    L.cell = points;
   },
-  duet(right = null, left = null) {
-    auto.figure = right;
-    if (!left) return unpin();
-    if (!pin.figure) setPin(centre(left.filter(Boolean)), auto.step / STEPS, DUET_PHASE);
-    pin.figure = left;
+  duet(right = null, left = null, phase = DUET_PHASE) {
+    band.right.figure = right;
+    const L = band.left;
+    if (!left) return unpin(L);
+    const at = centre(left.filter(Boolean));
+    if (!L.figure) pinAt(L, at, auto.step / STEPS, phase);
+    // Moving to another instrument, it keeps its place in the phase.
+    L.at = at;
+    L.figure = left;
   },
-  rest: pos => (!firing || !gun.order.slice(0, gun.beats).includes(pos)) && !auto.figure?.[pos],
+  rest: pos => {
+    const R = band.right;
+    return !(R.holding && R.order.slice(0, R.beats).includes(pos)) && !R.figure?.[pos];
+  },
   cue: bar => music.cueAt(music.t0 + (auto.start + bar * BAR) * PULSE),
   cascade() {
     for (const b of balls) if (!b.dying) b.age = Math.max(0, b.age - 10);
@@ -532,10 +561,10 @@ const autoIo = {
   end: stopAuto,
 };
 
-// Play for me: the guns play a fixed score and the player sits back and listens. The
-// physics runs in fixed steps counted on the audio clock, and every choice that could
-// change where a ball goes comes from a seeded generator, so it plays out the same way
-// every time, whatever the frame rate.
+// Play with me: two guns of the shop's own play a fixed score, and the player can play
+// along with theirs. The physics runs in fixed steps counted on the audio clock, and
+// every choice that could change where a ball goes comes from a seeded generator, so
+// left to itself it plays out the same way every time, whatever the frame rate.
 function startAuto() {
   music.init();
   music.rewind();
@@ -553,6 +582,9 @@ function startAuto() {
   for (const inst of shop.instruments) inst.last = -1e9;
   autoIo.hold(null);
   autoIo.duet(null);
+  band.right.order = [...SECTION_PATTERNS[0]];
+  firing = false;
+  unpin();
   cascade = 0;
   auto.cap = MAX_BALLS;
   auto.label = '';
@@ -566,7 +598,9 @@ function startAuto() {
   $('hud').classList.remove('hidden');
   $('landscape').classList.remove('faded');
   setTimeout(() => $('landscape').classList.add('faded'), 5000);
-  showHint(IS_TOUCH ? 'Sit back and listen' : 'Sit back and listen · Esc to stop', 4500);
+  showHint(IS_TOUCH
+    ? 'Play along, or just listen · tap to launch · a second finger pins your left gun'
+    : 'Play along, or just listen · click to launch · right-click pins your left gun · Esc to stop', 5000);
 }
 
 function stopAuto() {
@@ -579,6 +613,8 @@ function stopAuto() {
   targets.allow = null;
   autoIo.hold(null);
   autoIo.duet(null);
+  firing = false;
+  unpin();
   for (const b of balls) b.dying = true;
   targets.reset();
   document.body.classList.remove('auto');
@@ -586,7 +622,7 @@ function stopAuto() {
   $('overlay').classList.remove('hidden');
 }
 
-// Back to the title screen, from play or from Play for me.
+// Back to the title screen, from play or from Play with me.
 function goHome() {
   if (game.state === 'auto') return stopAuto();
   if (game.state !== 'playing') return;
@@ -615,13 +651,16 @@ function advanceAuto() {
     if (q >= auto.start) auto.score.pulse(q - auto.start);
     if (game.state !== 'auto') return;
     onPulse(q);
+    lastPulse = q;
     // Past the score's limit, the oldest ball drops out, one a pulse.
     const live = balls.filter(b => !b.dying);
     if (live.length > auto.cap) live[0].dying = true;
   }
   world.step(STEP);
   for (const p of pending.splice(0)) handleCollision(p);
-  updatePhaser(STEP, auto.step / STEPS);
+  const R = band.right;
+  updatePhaser(band.left, STEP, auto.step / STEPS, R.order.slice(0, Math.max(R.beats, PATTERN_START)), () => BAND_AT.left);
+  updatePlayerPin(STEP, auto.step / STEPS);
   targets.update(STEP);
   ageBalls(STEP);
 }
@@ -634,68 +673,88 @@ let firing = false, lastShot = 0, lastPulse = -1, cascade = 0;
 // The gun's pattern, in build-up order, and how many of its notes are sounding.
 const gun = { order: [...SECTION_PATTERNS[0]], beats: PATTERN_START, heldBar: -99 };
 
-// The second gun's pin and its phase: how many pulses it runs ahead of the first,
-// whether it is holding there or drifting towards the next pulse, and the last
-// pulse it played.
-const pin = { at: null, lead: 0, target: 1, drifting: false, since: 0, last: -1, kick: 0 };
+// A second gun's pin and its phase: where it aims, how many pulses it runs ahead of
+// the first, whether it is holding there or drifting towards the next pulse, and the
+// last pulse it played. It may instead play a melody or a fixed figure.
+const newPin = () => ({
+  at: null, cell: null, figure: null, shots: 0, phase: PHASE,
+  lead: 0, target: 1, drifting: false, since: 0, last: -1, kick: 0,
+});
+// The player's left gun.
+const pin = newPin();
+// Play with me's guns, kept apart from the player's: the right one's pattern, melody
+// and figure, and the left one's pin.
+const band = {
+  right: { order: [...SECTION_PATTERNS[0]], beats: PATTERN_START, heldBar: -99, holding: false, cell: null, figure: null, shots: 0 },
+  left: newPin(),
+};
 
 const centre = points => points.reduce((a, p) => a.add(p), new THREE.Vector3()).divideScalar(points.length);
 
-// Pins the second gun at `p`, as of `now` in pulses, to phase against the first as
+// Pins a second gun at `p`, as of `now` in pulses, to phase against the first as
 // `phase` describes.
-function setPin(p, now, phase = PHASE) {
-  Object.assign(pin, {
+function pinAt(pn, p, now, phase = PHASE) {
+  Object.assign(pn, {
     at: p.clone(), cell: null, figure: null, shots: 0, phase,
     lead: 0, target: 1, drifting: false, since: now, last: Math.floor(now),
   });
+}
+
+function setPin(p, now) {
+  pinAt(pin, p, now);
   pinMark.position.copy(p);
   pinMark.lookAt(camera.position);
   pinMark.visible = true;
   // The first time, say what just happened and how to undo it.
-  if (game.state === 'playing' && !pin.explained) {
+  if (!pin.explained) {
     pin.explained = true;
     showHint(`Left gun pinned: it keeps firing here and drifts out of phase · ${IS_TOUCH ? 'tap the ring with a second finger' : 'right-click the ring'} to clear`, 5000);
   }
 }
 
-function unpin() {
-  pin.at = null;
-  pin.cell = null;
-  pin.figure = null;
-  pinMark.visible = false;
+function unpin(pn = pin) {
+  pn.at = null;
+  pn.cell = null;
+  pn.figure = null;
+  if (pn === pin) pinMark.visible = false;
 }
 
-// Steps the second gun along its own, slowly drifting pulse and fires its pattern, as
-// of `main` in pulses of the first gun.
-function updatePhaser(dt, main) {
-  if (!pin.at || !music.ctx) return;
-  if (!pin.drifting && main - pin.since > pin.phase.holdBars * BAR) pin.drifting = true;
-  if (pin.drifting) {
-    pin.lead += dt / PULSE * pin.phase.drift;
-    if (pin.lead >= pin.target) {
+// Steps a pinned gun along its own, slowly drifting pulse and fires, as of `main` in
+// pulses of the gun it follows, whose pattern is `pattern`. `from` says where it fires from.
+function updatePhaser(pn, dt, main, pattern, from) {
+  if (!pn.at || !music.ctx) return;
+  if (!pn.drifting && main - pn.since > pn.phase.holdBars * BAR) pn.drifting = true;
+  if (pn.drifting) {
+    pn.lead += dt / PULSE * pn.phase.drift;
+    if (pn.lead >= pn.target) {
       // A whole bar ahead is back in phase; count from there without skipping a beat.
-      if (pin.target >= BAR) pin.last -= BAR;
-      pin.lead = pin.target % BAR;
-      pin.target = pin.lead + 1;
-      pin.drifting = false;
-      pin.since = main;
+      if (pn.target >= BAR) pn.last -= BAR;
+      pn.lead = pn.target % BAR;
+      pn.target = pn.lead + 1;
+      pn.drifting = false;
+      pn.since = main;
     }
   }
-  const k = Math.floor(main + pin.lead);
-  if (k <= pin.last) return;
-  pin.last = k;
+  const k = Math.floor(main + pn.lead);
+  if (k <= pn.last) return;
+  pn.last = k;
   const pos = ((k % BAR) + BAR) % BAR;
   // Playing a fixed figure, it plays that; following a melody, it plays the notes in turn.
-  let to = pin.figure?.[pos];
-  if (!pin.figure) {
-    if (!gun.order.slice(0, Math.max(gun.beats, PATTERN_START)).includes(pos)) return;
-    to = pin.cell ? pin.cell[pin.shots++ % pin.cell.length] : pin.at;
+  let to = pn.figure?.[pos];
+  if (!pn.figure) {
+    if (!pattern.includes(pos)) return;
+    to = pn.cell ? pn.cell[pn.shots++ % pn.cell.length] : pn.at;
   }
   if (!to) return;
-  const from = game.state === 'auto' ? GUN_FROM.left : phaser.userData.mouth.getWorldPosition(new THREE.Vector3());
-  launch(from, to).phased = true;
-  pin.kick = 1;
-  music.effect('pop', 70, 0.5, from.toArray());
+  const at = from();
+  launch(at, to).phased = pn;
+  pn.kick = 1;
+  music.effect('pop', 70, 0.5, at.toArray());
+}
+
+function updatePlayerPin(dt, main) {
+  updatePhaser(pin, dt, main, gun.order.slice(0, Math.max(gun.beats, PATTERN_START)),
+    () => phaser.userData.mouth.getWorldPosition(new THREE.Vector3()));
 }
 
 // A press fires straight away. Holding on then claps the pattern on the pulse, and
@@ -720,21 +779,24 @@ function dropBall() {
   ball.body.angularVelocity.set(0, 0, 0);
 }
 
-// Once a bar, the gun's pattern takes one step towards the current section's: one
+// Once a bar, a gun's pattern takes one step towards the current section's: one
 // note that no longer belongs drops out and one new note joins at the end of the
 // build-up order, so a new section's rhythm arrives gradually, as in the piece.
-function morphGun() {
+function morphGun(g) {
   const target = SECTION_PATTERNS[music.section];
-  const drop = gun.order.findIndex(p => !target.includes(p));
-  if (drop >= 0) gun.order.splice(drop, 1);
-  const add = target.find(p => !gun.order.includes(p));
-  if (add !== undefined) gun.order.push(add);
+  const drop = g.order.findIndex(p => !target.includes(p));
+  if (drop >= 0) g.order.splice(drop, 1);
+  const add = target.find(p => !g.order.includes(p));
+  if (add !== undefined) g.order.push(add);
 }
 
 function onPulse(q) {
   const bar = Math.floor(q / BAR), pos = q % BAR;
-  if (pos === 0) morphGun();
-  if (auto.figure?.[pos]) shootFrom('right', auto.figure[pos]);
+  if (pos === 0) {
+    morphGun(gun);
+    morphGun(band.right);
+  }
+  if (game.state === 'auto') bandPulse(bar, pos);
   if (cascade > 0 && q % 2 === 0) {
     dropBall();
     cascade--;
@@ -743,9 +805,7 @@ function onPulse(q) {
     if (pos === 0 && gun.heldBar === bar - 1) gun.beats = Math.min(gun.order.length, gun.beats + 1);
     gun.heldBar = bar;
     // A pattern note right on the heels of the press would be a double shot, so skip it.
-    if (game.state === 'auto') {
-      if (gun.order.slice(0, gun.beats).includes(pos)) shootFrom('right', auto.cell[auto.shots++ % auto.cell.length]);
-    } else if (gun.order.slice(0, gun.beats).includes(pos) && performance.now() - lastShot > 120) {
+    if (gun.order.slice(0, gun.beats).includes(pos) && performance.now() - lastShot > 120) {
       fire(pointer);
       lastShot = performance.now();
     }
@@ -762,7 +822,7 @@ let mainPointer = null;
 canvas.addEventListener('pointermove', e => { if (mainPointer === null || e.pointerId === mainPointer) setPointer(e); });
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 canvas.addEventListener('pointerdown', e => {
-  if (game.state !== 'playing') return;
+  if (game.state !== 'playing' && game.state !== 'auto') return;
   // Right-click, or a second finger, pins the second gun where it points.
   if (e.button === 2 || (mainPointer !== null && e.pointerType === 'touch')) {
     const p = aimPoint(new THREE.Vector2(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1));
@@ -789,13 +849,13 @@ addEventListener('keydown', e => {
     music.setMuted(!music.muted);
     $('mute').textContent = music.muted ? '🔇' : '🔊';
   }
-  if (e.key === ' ' && game.state === 'playing') { startFiring(); e.preventDefault(); }
+  if (e.key === ' ' && (game.state === 'playing' || game.state === 'auto')) { startFiring(); e.preventDefault(); }
   if (e.key === 'Escape') stopAuto();
 });
 addEventListener('keyup', e => { if (e.key === ' ') firing = false; });
 document.addEventListener('visibilitychange', () => {
   music.setBackground(document.hidden);
-  if (document.hidden && game.state === 'playing') firing = false;
+  if (document.hidden) firing = false;
 });
 $('mute').addEventListener('click', () => {
   music.setMuted(!music.muted);
@@ -899,23 +959,17 @@ function frame(now) {
     ageBalls(dt);
   }
 
-  // Camera looks gently toward the pointer; in the menu it idles, and when playing for
-  // the player it drifts slowly after the right gun.
+  // Camera looks gently toward the pointer; in the menu it idles.
   let yaw, pitch;
-  if (game.state === 'auto') {
-    tmp.copy(auto.look).sub(CAMERA_POS);
-    yaw = 0.35 * Math.atan2(-tmp.x, -tmp.z);
-    pitch = 0.3 * Math.atan2(tmp.y, Math.hypot(tmp.x, tmp.z)) - 0.04 + tiltUp;
-  } else if (game.state === 'menu') {
+  if (game.state === 'menu') {
     yaw = Math.sin(clock * 0.15) * 0.22;
     pitch = -0.08 + tiltUp + Math.sin(clock * 0.21) * 0.04;
   } else {
     yaw = -pointer.x * 0.2;
     pitch = pointer.y * 0.12 - 0.06 + tiltUp;
   }
-  const ease = Math.min(1, dt * (game.state === 'auto' ? 0.5 : 4));
-  camera.rotation.y += (yaw - camera.rotation.y) * ease;
-  camera.rotation.x += (pitch - camera.rotation.x) * ease;
+  camera.rotation.y += (yaw - camera.rotation.y) * Math.min(1, dt * 4);
+  camera.rotation.x += (pitch - camera.rotation.x) * Math.min(1, dt * 4);
 
   if (game.state === 'playing') {
     // Shots go out on the shop's pulse, never between.
@@ -935,9 +989,7 @@ function frame(now) {
   }
 
   // The launcher turns toward what the crosshair is over.
-  if (game.state === 'auto') {
-    aimTarget.lerp(auto.look, Math.min(1, dt * 10));
-  } else if (game.state !== 'menu') {
+  if (game.state !== 'menu') {
     raycaster.setFromCamera(pointer, camera);
     aimTarget.copy(raycaster.ray.at(8, tmp));
   } else {
@@ -947,14 +999,27 @@ function frame(now) {
   launcher.rotateY(Math.PI);
   // Unpinned, the left gun rests pointing ahead and a little outwards.
   phaser.position.copy(PHASER_REST);
-  phaser.lookAt(pin.at ?? auto.leftLook ?? camera.localToWorld(tmp.set(-1.5, -0.5, -8)));
+  phaser.lookAt(pin.at ?? camera.localToWorld(tmp.set(-1.5, -0.5, -8)));
   phaser.rotateY(Math.PI);
   phaser.translateZ(0.1 * pin.kick);
   pin.kick *= Math.exp(-dt * 12);
   pinMark.scale.setScalar(1 + 0.25 * pin.kick);
-  if (game.state === 'playing') updatePhaser(dt, (music.ctx.currentTime - music.t0) / PULSE);
+  if (game.state === 'playing') updatePlayerPin(dt, (music.ctx.currentTime - music.t0) / PULSE);
   recoil *= Math.exp(-dt * 12);
   launcher.position.copy(LAUNCHER_REST).addScaledVector(new THREE.Vector3(0, -0.02, 0.1), recoil);
+  // Play with me's guns turn to where they last fired, the left one to its pin.
+  for (const side in bandGuns) {
+    const g = bandGuns[side], pinned = side === 'left' && band.left.at;
+    g.group.visible = game.state === 'auto';
+    if (!g.group.visible) continue;
+    const kick = Math.max(g.kick, side === 'left' ? band.left.kick : 0);
+    g.bell.position.copy(BAND_AT[side]);
+    g.bell.lookAt(pinned ? band.left.at : g.look);
+    g.bell.rotateY(Math.PI);
+    g.bell.translateZ(0.12 * kick);
+    g.kick *= Math.exp(-dt * 12);
+    if (side === 'left') band.left.kick *= Math.exp(-dt * 12);
+  }
 
   for (const b of balls) {
     b.holder.position.copy(b.body.position);

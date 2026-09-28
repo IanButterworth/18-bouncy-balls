@@ -246,7 +246,7 @@ button#play {
 }
 button#play:hover { transform: translateY(-2px); }
 button#play:active { transform: translateY(3px); box-shadow: 0 2px 0 #7a1020; }
-/* Play for me: the quieter of the two. */
+/* Play with me: the quieter of the two. */
 button#auto {
   font: inherit;
   font-weight: 600;
@@ -262,9 +262,7 @@ button#auto {
 button#auto:hover { transform: translateY(-2px); background: rgba(31, 74, 70, 0.08); }
 button#auto:active { transform: translateY(1px); }
 
-/* While playing for the player there is nothing to aim and no score to keep. */
-body.auto #crosshair { display: none; }
-body.auto #c { cursor: default; }
+/* Playing along, there is no score to keep. */
 body.auto .score { visibility: hidden; }
 
 

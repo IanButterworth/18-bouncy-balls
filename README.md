@@ -54,19 +54,23 @@ The shop keeps one steady pulse, five to the second in bars of twelve.
 - Striking the Leslie cabinet spins its horn and drum up from chorale towards
   tremolo, faster with more strikes, and they wind lazily back down.
 - The ensemble breathes, swelling and fading every few seconds.
-- *Play for me* hands both guns to a fixed score of about thirteen minutes, after
-  the shape of the piece. It opens with the Pulses, each chord of the cycle in turn
-  over a steady pulse with the pipe and combo organs breathing on it and a shot at a
-  target cueing each change. Then each chord gets a section of its own: a cascade
-  onto the bars, the right gun building its pattern a note at a time on a short
-  melody that changes a note at a time, and the left gun following the melody in
-  canon on another instrument, drifting a pulse at a time out of phase. Then the two
+- *Play with me* sets two more guns on the counter, wider apart than yours, playing
+  a fixed score of about thirteen minutes after the shape of the piece, while you
+  play along with your own guns or just listen. It opens with the Pulses, starting
+  from just two quick notes on the central marimba, answered by the second gun
+  drifting out of phase and back while the pair branches out to the outer marimbas
+  and the xylophones. Then comes each chord of the cycle in turn over a steady
+  pulse, with the three organs taking turns to breathe on it and a shot at a target
+  cueing each change. Then each chord gets a section of its own: a cascade onto the
+  bars, the right gun building its pattern a note at a time on a short melody that
+  changes a note at a time, and the left gun following the melody in canon on
+  another instrument, drifting a pulse at a time out of phase. Then the two
   xylophones take over, one each side, with a fast figure played the same on both:
   two bars in unison, then one slips slowly ahead of the other. Through it all the
   texture swells and recedes. The Pulses return to close, and the last chord is left
   ringing while the balls drop out one by one. The physics runs in fixed steps on the
-  audio clock and every choice comes from a fixed seed, so it plays out the same way
-  every time.
+  audio clock and every choice comes from a fixed seed, so left to itself it plays
+  out the same way every time.
 
 Sound is placed where it happens. Each note comes from the point the ball
 struck, through an HRTF panner relative to where you stand and look, quieter
