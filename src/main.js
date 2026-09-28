@@ -963,7 +963,14 @@ let last = performance.now(), clock = 0, demoTimer = 1;
 const aimTarget = new THREE.Vector3();
 const camFwd = new THREE.Vector3(), camUp = new THREE.Vector3();
 
+// At most 60 frames a second: a faster screen would double the work for motion that
+// looks the same. `due` is when the next frame may be drawn.
+const FRAME_MS = 1000 / 60;
+let due = 0;
+
 function frame(now) {
+  if (now < due - 1) return;
+  due = Math.max(due + FRAME_MS, now);
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   clock += dt;
