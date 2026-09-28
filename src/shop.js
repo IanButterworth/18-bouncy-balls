@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 export const PI = Math.PI;
 const clamp01 = x => Math.min(1, Math.max(0, x));
@@ -372,12 +373,15 @@ export class Shop {
     if (typeof inst.glow === 'number') inst.glow = new THREE.Color(inst.glow);
     inst.base = { rot: node.rotation.clone(), scale: node.scale.clone(), pos: node.position.clone() };
     if (inst.musical) {
+      // One copy of each material per instrument, so it can glow when struck.
+      const copies = new Map();
       node.traverse(o => {
         if (o.isMesh && !o.userData.noFlash && !Array.isArray(o.material) && o.material.emissive) {
-          o.material = o.material.clone();
-          inst.mats.push(o.material);
+          if (!copies.has(o.material)) copies.set(o.material, o.material.clone());
+          o.material = copies.get(o.material);
         }
       });
+      inst.mats.push(...copies.values());
     }
     this.instruments.push(inst);
     return inst;
@@ -436,6 +440,73 @@ export class Shop {
         o.receiveShadow = true;
       }
     });
+  }
+
+  // Meshes whose materials are alike share one, so more of them can be drawn together.
+  // The instruments' own copies are left alone, as they glow when struck.
+  shareMaterials() {
+    const glowing = new Set(this.instruments.flatMap(i => i.mats));
+    const describe = m => JSON.stringify(Object.entries(m).map(([k, v]) => {
+      if (['uuid', 'name', 'id', 'version', 'userData'].includes(k)) return null;
+      if (v?.isColor) return [k, v.getHex()];
+      if (v?.isTexture) return [k, v.uuid];
+      if (v?.toArray) return [k, v.toArray()];
+      return [k, v];
+    }));
+    const alike = new Map();
+    this.root.traverse(o => {
+      const m = o.material;
+      if (!o.isMesh || Array.isArray(m) || glowing.has(m)) return;
+      const key = describe(m);
+      if (!alike.has(key)) alike.set(key, m);
+      o.material = alike.get(key);
+    });
+  }
+
+  // Draws the shop with far fewer draw calls but no change to how it looks: within the
+  // room, and within each thing in `moving` (which moves as one), meshes that share a
+  // material become one mesh. Transparent meshes, whose drawing order matters, and
+  // mirrored ones, whose faces would turn inside out, are left as they are, and so are
+  // the chandeliers, whose tiny glints would shift by a pixel.
+  mergeStatic(moving) {
+    this.shareMaterials();
+    this.root.updateMatrixWorld(true);
+    const crystals = new Set(this.instruments.filter(i => i.voice === 'crystal').map(i => i.node));
+    for (const root of [this.root, ...moving]) if (!crystals.has(root)) this.mergeUnder(root, moving);
+  }
+
+  mergeUnder(root, moving) {
+    const toRoot = root.matrixWorld.clone().invert();
+    const sets = new Map();
+    const walk = o => {
+      if (o !== root && moving.has(o)) return;
+      const m = o.material, g = o.geometry;
+      if (o !== root && o.isMesh && !o.isInstancedMesh && !o.children.length && o.visible && o.frustumCulled
+          && !o.renderOrder && !Array.isArray(m) && !m.transparent && !Object.keys(g.morphAttributes).length
+          && o.matrixWorld.determinant() > 0) {
+        const attrs = Object.keys(g.attributes).sort().map(k => `${k}${g.attributes[k].itemSize}`).join();
+        const key = `${m.uuid} ${o.castShadow} ${o.receiveShadow} ${!!g.index} ${attrs}`;
+        if (!sets.has(key)) sets.set(key, []);
+        sets.get(key).push(o);
+      }
+      for (const c of [...o.children]) walk(c);
+    };
+    walk(root);
+    for (const list of sets.values()) {
+      if (list.length < 2) continue;
+      const geos = list.map(o => {
+        const g = o.geometry.clone().applyMatrix4(new THREE.Matrix4().multiplyMatrices(toRoot, o.matrixWorld));
+        // One material, so the geometry's material groups make no difference.
+        g.clearGroups();
+        return g;
+      });
+      const merged = new THREE.Mesh(mergeGeometries(geos), list[0].material);
+      merged.castShadow = list[0].castShadow;
+      merged.receiveShadow = list[0].receiveShadow;
+      for (const o of list) o.removeFromParent();
+      for (const g of geos) g.dispose();
+      root.add(merged);
+    }
   }
 
   // `push` is how hard and which way the ball struck, for things that swing freely.

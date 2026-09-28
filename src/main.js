@@ -162,6 +162,11 @@ buildOrgan(shop);
 const decor = buildDecor(shop);
 shop.finalize();
 Math.random = random;
+// Only the instruments that swing, bob or rock, the metronome and the Leslie's rotors move.
+shop.mergeStatic(new Set([
+  ...shop.instruments.filter(i => i.pendulum || i.wobble !== 'none').map(i => i.node),
+  shop.metronome, shop.leslie.horn, shop.leslie.drum,
+]));
 const targets = new Targets(scene, world, pm);
 const fx = new Effects(scene, camera);
 const music = new Music();
