@@ -37,7 +37,8 @@ The shop keeps one steady pulse, five to the second in bars of twelve.
   left hand, to a spot in the shop. It keeps firing your pattern there,
   in step at first; then, as in *Piano Phase*, it runs a touch faster until it is
   one pulse ahead, holds, and moves ahead again, stepping through every offset
-  until it is back in phase. Right-click the pin to clear it.
+  until it is back in phase. Its notes keep to its own drifting pulse, so they are heard
+  slipping gradually out of phase. Right-click the pin to clear it.
 - Every note comes from something being struck in the room; only the organs
   sustain on their own once struck.
 - Hitting a target rings it once and moves the ensemble to the next chord at the
@@ -53,6 +54,19 @@ The shop keeps one steady pulse, five to the second in bars of twelve.
 - Striking the Leslie cabinet spins its horn and drum up from chorale towards
   tremolo, faster with more strikes, and they wind lazily back down.
 - The ensemble breathes, swelling and fading every few seconds.
+- *Play for me* hands both guns to a fixed score of about thirteen minutes, after
+  the shape of the piece. It opens with the Pulses, each chord of the cycle in turn
+  over a steady pulse with the pipe and combo organs breathing on it and a shot at a
+  target cueing each change. Then each chord gets a section of its own: a cascade
+  onto the bars, the right gun building its pattern a note at a time on a short
+  melody that changes a note at a time, and the left gun following the melody in
+  canon on another instrument, drifting a pulse at a time out of phase. Then the two
+  xylophones take over, one each side, with a fast figure played the same on both:
+  two bars in unison, then one slips slowly ahead of the other. Through it all the
+  texture swells and recedes. The Pulses return to close, and the last chord is left
+  ringing while the balls drop out one by one. The physics runs in fixed steps on the
+  audio clock and every choice comes from a fixed seed, so it plays out the same way
+  every time.
 
 Sound is placed where it happens. Each note comes from the point the ball
 struck, through an HRTF panner relative to where you stand and look, quieter

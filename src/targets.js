@@ -70,6 +70,9 @@ export class Targets {
     this.list = [];
     this.queue = [];
     this.count = START_TARGETS;
+    // Where targets may stand, and the generator that picks among those spots.
+    this.allow = null;
+    this.rand = Math.random;
     const face = new THREE.MeshStandardMaterial({ map: bullseyeTex(), roughness: 0.45 });
     this.mats = {
       face,
@@ -104,8 +107,8 @@ export class Targets {
 
   spawn(delay = 0) {
     const used = new Set(this.list.map(t => t.spawn));
-    const free = SPAWNS.filter(s => !used.has(s));
-    const s = free[Math.floor(Math.random() * free.length)];
+    const free = SPAWNS.filter(s => !used.has(s) && (!this.allow || this.allow(s)));
+    const s = free[Math.floor(this.rand() * free.length)];
     const m = this.mats;
     const root = new THREE.Group();
     root.position.set(...s.p);

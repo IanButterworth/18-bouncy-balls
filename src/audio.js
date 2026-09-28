@@ -97,6 +97,10 @@ export class Music {
     this.comboAt = [-8.3, 1.05, -2.8];
     this.energy = 0;
     this.muted = false;
+    // Sections move on by themselves unless a fixed score is deciding when.
+    this.autoAdvance = true;
+    // The moment notes are struck, when the physics runs on its own clock rather than the audio's.
+    this.simTime = null;
   }
 
   init() {
@@ -205,9 +209,20 @@ export class Music {
     }
   }
 
+  now() {
+    return this.simTime ?? this.ctx.currentTime;
+  }
+
+  // Back to the first chord, with no change coming.
+  rewind() {
+    this.section = 0;
+    this.pending = null;
+    this.sectionStart = this.ctx.currentTime;
+  }
+
   chord() {
     if (!this.ctx) return CYCLE[0];
-    if (this.pending && this.ctx.currentTime >= this.pending.at) {
+    if (this.pending && this.now() >= this.pending.at) {
       this.section = this.pending.section;
       this.sectionStart = this.pending.at;
       this.pending = null;
@@ -269,25 +284,26 @@ export class Music {
 
   // Plays a chord tone in [lo, hi]; slot picks how high in that range, step walks from there.
   // A gliss above one runs up the following chord tones, like a strummed harp.
-  // `pos` is where in the room the instrument was struck, in scene metres.
-  hit(voice, lo, hi, slot, step, vel, pos, gliss = 1) {
+  // `pos` is where in the room the instrument was struck, in scene metres. `lag` shifts
+  // the grid the note waits for, for a player drifting against the shop's pulse.
+  hit(voice, lo, hi, slot, step, vel, pos, gliss = 1, lag = 0) {
     if (!this.ready()) return null;
     if (this.active > 110) return null;
     if (this.active > 70 && vel < 0.35) return null;
     const midi = this.pick(lo, hi, slot, step);
-    this.play(voice, midi, vel, pos);
+    this.play(voice, midi, vel, pos, 0, true, lag);
     for (let k = 1; k < gliss; k++) {
-      this.play(voice, this.pick(lo, hi, slot, step + k), vel * (1 - 0.12 * k), pos, k * GRID);
+      this.play(voice, this.pick(lo, hi, slot, step + k), vel * (1 - 0.12 * k), pos, k * GRID, true, lag);
     }
     return midi;
   }
 
-  play(voice, midi, vel, pos, delay = 0, onGrid = true) {
+  play(voice, midi, vel, pos, delay = 0, onGrid = true, lag = 0) {
     const ctx = this.ctx, lp = this.listener.pos;
     const dist = Math.max(0.3, Math.hypot(pos[0] - lp[0], pos[1] - lp[1], pos[2] - lp[2]));
-    let t = ctx.currentTime + 0.004 + delay;
+    let t = this.now() + 0.004 + delay;
     // Every note waits for the next step of the pulse, then for its sound to cross the room.
-    if (onGrid) t = this.t0 + Math.ceil((t - this.t0) / GRID) * GRID;
+    if (onGrid) t = this.t0 + lag + Math.ceil((t - this.t0 - lag) / GRID) * GRID;
     t += dist / SPEED_OF_SOUND;
     const out = ctx.createGain();
     out.gain.value = (LEVEL[voice] ?? 0.3) * (0.12 + 0.88 * vel);
@@ -664,6 +680,12 @@ export class Music {
     return true;
   }
 
+  // Moves to the next chord at a given time, as a fixed score asks, whether or not it can be heard.
+  cueAt(at) {
+    this.pending = { section: (this.section + 1) % CYCLE.length, at };
+    this.swell(2, at);
+  }
+
   // Crystal pendants knocked together: a quick tumble of tiny glass clinks, more for
   // a harder knock, pitched high in the chord but loose in time as they settle.
   jingle(pos, vel) {
@@ -707,7 +729,7 @@ export class Music {
     R.at = at;
     this.chord();
     // A section left alone for too long moves on quietly at the next bar.
-    if (!this.pending && this.ctx.currentTime - this.sectionStart > SECTION_MAX) {
+    if (this.autoAdvance && !this.pending && this.ctx.currentTime - this.sectionStart > SECTION_MAX) {
       this.pending = { section: (this.section + 1) % CYCLE.length, at: this.nextBarTime(this.ctx.currentTime) };
     }
   }
