@@ -2,10 +2,11 @@
 // Music for 18 Musicians. It opens with the Pulses, each chord of the cycle in turn
 // over a steady pulse with the organs breathing on it, gives each chord a section of
 // its own, and closes with the Pulses again before the balls fall silent one by one.
-// Every section is built the same slow way: a pattern that grows a note at a time, a
-// melody that changes a note at a time, and a second gun in canon drifting out of phase.
-// Then the two xylophones take over with a fast figure, the same on both, one of them
-// slipping slowly out of phase with the other.
+// Sections take turns. In one, a pattern grows a note at a time on a melody that
+// changes a note at a time, with a second gun following in canon, drifting out of
+// phase. In the next, the two xylophones play one fast figure, one of them slipping
+// slowly out of phase with the other. The guns only start, stop or move to another
+// instrument as the chord changes.
 import { BAR } from './audio.js';
 
 const CHORDS = 11;
@@ -16,14 +17,15 @@ const OPEN = CHORDS * PULSE_BARS;
 const CLOSE = OPEN + CHORDS * SECTION_BARS;
 // The last chord of the closing Pulses is held while the balls fall away.
 const LAST = CLOSE + OPEN - PULSE_BARS;
-// The Pulses begin with two quick notes alone: a pair on the second and third pulse of
-// every three, as chord-tone steps. The left gun joins after a bar and slips ahead a
-// pulse every four bars, so after three it is back in unison. It starts on the central
-// marimba and branches wider: the right gun's instrument, the left's, and the bar each
-// pair moves there.
+// The Pulses begin with two quick notes alone, a pair on the second and third pulse of
+// every three, as chord-tone steps: the right gun alone on the central marimba for the
+// first chord, then the two guns on the marimbas either side of it. The left one slips
+// ahead a pulse every four bars, so every twelve bars it is back in unison. It plays on
+// under the Pulses until the first section, and returns for the closing Pulses, losing
+// a note a bar from their last chord until it falls silent.
 const FIGURE = {
-  steps: '. 7 9 . 7 9 . 7 9 . 7 9', join: 1, until: 14, phase: { holdBars: 1, drift: 1 / 36 },
-  places: [['marimba1', 'marimba0', 0], ['marimba2', 'marimba0', 4], ['xylo1', 'xylo0', 8]],
+  steps: '. 7 9 . 7 9 . 7 9 . 7 9', phase: { holdBars: 1, drift: 1 / 36 },
+  places: [['marimba1', null], ['marimba2', 'marimba0']],
 };
 
 // The keys and bars that carry the Pulses, played by the left gun, as chord-tone steps
@@ -33,30 +35,31 @@ const PULSE_SPOTS = [
   ['piano', 9], ['marimba1', 10], ['metallophone', 6], ['marimba2', 8], ['harpsichord', 3],
 ];
 
-// Each section: the instrument the right gun plays its melody on and the one the left
-// gun follows it on in canon. The melody is chord-tone steps from 0 (lowest) to 12 and
-// turns from `cell` into `to` one note at a time. `breath` is the organ that breathes
-// over the build-up and the one over its close; `maracas` and `spin` bring in the
-// maracas and spin up the Leslie; `peak` is how many balls the texture swells to.
-// `xylo` is the twin xylophones' figure: a chord-tone step or a rest for each pulse of the bar.
+// Each section is one of two kinds. A melody section names the instrument the right gun
+// plays its melody on and the one the left gun follows it on in canon; the melody is
+// chord-tone steps from 0 (lowest) to 12 and turns from `cell` into `to` one note at a
+// time. A xylophone section gives the twin xylophones' figure in `xylo`: a chord-tone
+// step or a rest for each pulse of the bar. `breath` is the organ that breathes over the
+// first half and the one over the second; `maracas` and `spin` bring in the maracas and
+// spin up the Leslie; `peak` is how many balls the texture swells to.
 const SECTIONS = [
-  { lead: 'marimba1', canon: 'marimba0', cell: [4, 6, 5, 8, 7], to: [4, 7, 5, 9, 8], breath: ['combo', 'tonewheel'], maracas: true, peak: 34, xylo: '6 9 7 . 10 8 6 . 9 11 8 .' },
-  { lead: 'piano', canon: 'harpsichord', cell: [3, 5, 7, 6], to: [3, 6, 8, 6], breath: ['tonewheel', 'pipes'], peak: 30, xylo: '8 6 9 . 7 10 . 8 11 9 . 7' },
-  { lead: 'marimba0', canon: 'marimba2', cell: [5, 7, 6, 9, 8, 7], to: [5, 8, 6, 10, 8, 7], breath: ['combo', 'combo'], maracas: true, peak: 32, xylo: '5 7 9 7 . 10 8 . 6 9 11 .' },
-  { lead: 'marimba2', canon: 'marimba1', cell: [2, 4, 6, 5], to: [3, 5, 7, 5], breath: ['tonewheel', 'combo'], spin: true, peak: 36, xylo: '9 . 7 10 8 . 11 9 . 7 10 .' },
-  { lead: 'metallophone', canon: 'upright', cell: [6, 8, 7, 10], to: [6, 9, 7, 11], breath: ['pipes', 'tonewheel'], peak: 24, xylo: '7 9 . 8 10 . 9 11 . 10 8 .' },
-  { lead: 'marimba0', canon: 'piano', cell: [4, 5, 7, 6, 9], to: [5, 6, 8, 7, 10], breath: ['combo', 'tonewheel'], maracas: true, spin: true, peak: 40, xylo: '6 8 10 . 9 7 . 11 9 . 8 10' },
-  { lead: 'upright', canon: 'harpsichord', cell: [3, 6, 4, 7], to: [4, 7, 5, 8], breath: ['tonewheel', 'combo'], peak: 30, xylo: '10 8 . 9 7 . 11 8 . 10 9 .' },
-  { lead: 'marimba2', canon: 'metallophone', cell: [6, 8, 7, 5], to: [7, 9, 8, 6], breath: ['combo', 'pipes'], maracas: true, peak: 32, xylo: '7 . 9 8 11 . 10 . 8 9 7 .' },
-  { lead: 'piano', canon: 'marimba2', cell: [2, 5, 4, 7, 6], to: [3, 6, 5, 8, 7], breath: ['tonewheel', 'combo'], peak: 34, xylo: '8 10 7 . 9 11 . 8 10 . 7 9' },
-  { lead: 'marimba1', canon: 'marimba0', cell: [5, 7, 9, 8], to: [6, 8, 10, 8], breath: ['combo', 'tonewheel'], maracas: true, spin: true, peak: 38, xylo: '9 11 . 10 8 . 9 12 . 10 11 .' },
-  { lead: 'metallophone', canon: 'piano', cell: [7, 9, 8, 11], to: [7, 10, 8, 12], breath: ['pipes', 'combo'], peak: 24, xylo: '7 9 8 . 10 9 . 11 . 8 10 .' },
+  { lead: 'marimba1', canon: 'marimba0', cell: [4, 6, 5, 8, 7], to: [4, 7, 5, 9, 8], breath: ['combo', 'tonewheel'], maracas: true, peak: 34 },
+  { xylo: '8 6 9 . 7 10 . 8 11 9 . 7', breath: ['tonewheel', 'pipes'], peak: 30 },
+  { lead: 'marimba0', canon: 'marimba2', cell: [5, 7, 6, 9, 8, 7], to: [5, 8, 6, 10, 8, 7], breath: ['combo', 'combo'], maracas: true, peak: 32 },
+  { xylo: '9 . 7 10 8 . 11 9 . 7 10 .', breath: ['tonewheel', 'combo'], spin: true, peak: 36 },
+  { lead: 'metallophone', canon: 'upright', cell: [6, 8, 7, 10], to: [6, 9, 7, 11], breath: ['pipes', 'tonewheel'], peak: 24 },
+  { xylo: '6 8 10 . 9 7 . 11 9 . 8 10', breath: ['combo', 'tonewheel'], maracas: true, spin: true, peak: 40 },
+  { lead: 'upright', canon: 'harpsichord', cell: [3, 6, 4, 7], to: [4, 7, 5, 8], breath: ['tonewheel', 'combo'], peak: 30 },
+  { xylo: '7 . 9 8 11 . 10 . 8 9 7 .', breath: ['combo', 'pipes'], maracas: true, peak: 32 },
+  { lead: 'piano', canon: 'marimba2', cell: [2, 5, 4, 7, 6], to: [3, 6, 5, 8, 7], breath: ['tonewheel', 'combo'], peak: 34 },
+  { xylo: '9 11 . 10 8 . 9 12 . 10 11 .', breath: ['combo', 'tonewheel'], maracas: true, spin: true, peak: 38 },
+  { lead: 'metallophone', canon: 'piano', cell: [7, 9, 8, 11], to: [7, 10, 8, 12], breath: ['pipes', 'combo'], peak: 24 },
 ];
 
 // The melody a section has reached by a bar: from the fourth bar, one note every two bars
 // changes to the new one.
 const melody = (S, b) => S.cell.map((x, i) => (b - 3) / 2 >= i ? S.to[i] : x);
-const figure = (S, name, gun, io) => S.xylo.split(' ').map(x => x === '.' ? null : io.at(name, +x, gun));
+const xyloFigure = (S, name, gun, io) => S.xylo.split(' ').map(x => x === '.' ? null : io.at(name, +x, gun));
 
 // `io` is how the score reaches the shop:
 //   at(name, step, gun)         where a gun aims to play a step on an instrument
@@ -104,11 +107,16 @@ export class Autoplay {
     if (bar >= LAST + PULSE_BARS) return this.fade(bar, pos);
     const pulse = closing || k0 >= PULSE_BARS;
     const organs = closing || k0 >= PULSE_BARS + 2;
-    if (!closing && pos === 0 && k0 <= FIGURE.until) {
-      const figure = (name, gun) => FIGURE.steps.split(' ').map(x => x === '.' ? null : io.at(name, +x, gun));
-      const [right, left] = FIGURE.places.findLast(([, , from]) => k0 >= from);
-      if (k0 === FIGURE.until) io.duet();
-      else io.duet(figure(right, 'right'), k0 >= FIGURE.join ? figure(left, 'left') : null, FIGURE.phase);
+    // The figure only moves as the chord changes. The last section's guns give way to it
+    // as the closing Pulses begin.
+    if (closing && k === CHORDS - 1 && pos === 0) this.thinFigure(bar);
+    else if (p === 0) {
+      const [right, left] = FIGURE.places[closing ? 1 : Math.min(k, FIGURE.places.length - 1)];
+      if (closing && k0 === 0) {
+        io.hold(null);
+        io.duet();
+      }
+      io.duet(this.figure(right, 'right'), this.figure(left, 'left'), FIGURE.phase);
     }
     if (p === 0) {
       io.label('Pulses');
@@ -125,10 +133,24 @@ export class Autoplay {
     if (closing && k === CHORDS - 1 && p === 0) io.cap(10);
   }
 
+  // The opening figure on an instrument, keeping only its first `notes` notes.
+  figure(name, gun, notes = Infinity) {
+    if (!name) return null;
+    return FIGURE.steps.split(' ').map(x => x === '.' || notes-- <= 0 ? null : this.io.at(name, +x, gun));
+  }
+
+  // From the last chord, the figure loses a note each bar until the guns fall silent.
+  thinFigure(bar) {
+    const [right, left] = FIGURE.places[1], notes = FIGURE.steps.split(' ').filter(x => x !== '.').length - (bar - LAST);
+    if (notes > 0) this.io.duet(this.figure(right, 'right', notes), this.figure(left, 'left', notes), FIGURE.phase);
+    else this.io.duet();
+  }
+
   // The end: the last chord held on while the balls drop out one by one, then silence.
   fade(bar, pos) {
     const io = this.io;
     const b = bar - LAST - PULSE_BARS;
+    if (pos === 0) this.thinFigure(bar);
     if (b === 0 && pos === 0) io.shoot('right', io.spot('pipes'));
     if (pos === 0) io.cap(Math.max(0, 8 - b));
     if (io.live() > 0) return;
@@ -142,21 +164,24 @@ export class Autoplay {
         io.label(`Section ${['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI'][s]}`);
         io.cascade();
         io.cap(20);
+        // Whatever the last section's guns were doing stops here, and this one's starts.
+        io.hold(null);
+        io.duet();
+        // The twin xylophones, one each side: two bars in unison, then the left one
+        // slowly slips ahead, a pulse every few bars, until the section ends.
+        if (S.xylo) io.duet(xyloFigure(S, 'xylo1', 'right', io), xyloFigure(S, 'xylo0', 'left', io));
       }
       if (b === 1 && S.maracas) io.shoot('left', io.spot('maracas'));
       if (b === 5) io.cap(S.peak);
-      // The right gun builds its pattern for eight bars; the left gun joins in canon two
-      // bars in and carries on a bar after it stops, drifting a pulse at a time.
-      const cell = melody(S, b);
-      if (b >= 2 && b < 10) io.hold(cell.map(i => io.at(S.lead, i, 'right')));
-      if (b === 10) io.hold(null);
-      if (b >= 4 && b < 11) io.canon(cell.map(i => io.at(S.canon, i, 'left')));
-      if (b === 11) io.canon(null);
-      // Then the twin xylophones, one each side: two bars in unison, then the left one
-      // slowly slips ahead until it is nearly a pulse in front.
-      if (b === 11) io.duet(figure(S, 'xylo1', 'right', io), figure(S, 'xylo0', 'left', io));
+      // The right gun builds its pattern from the first bar to the last, and the left gun
+      // follows in canon, in step at first, then drifting a pulse at a time.
+      if (S.lead) {
+        const cell = melody(S, b);
+        io.hold(cell.map(i => io.at(S.lead, i, 'right')));
+        io.canon(cell.map(i => io.at(S.canon, i, 'left')));
+      }
+      if (b === 16) io.cap(Math.round(S.peak * 0.6));
       if (b === 18) {
-        io.duet();
         io.cap(14);
         this.cue(bar + 2);
       }
