@@ -51,10 +51,10 @@
     "offers": { "@type": "Offer", "price": "0", "priceCurrency": "GBP" }
   }
   </script>
-  <!-- Google Analytics 4, loaded only on the published site so local play isn't counted. -->
+  <!-- Google Analytics 4 for ianbtw.com, loaded only there so local play isn't counted. -->
   <script>
-    const GA_ID = 'G-3TF4YB9E79';
-    if (GA_ID && /(^|\.)(ianbtw\.com|github\.io)$/.test(location.hostname)) {
+    const GA_ID = 'G-RBKP6YFTXQ';
+    if (GA_ID && location.hostname === 'ianbtw.com') {
       const s = document.createElement('script');
       s.async = true;
       s.src = `https://www.googletagmanager.com/gtag/js?id=${GA_ID}`;
