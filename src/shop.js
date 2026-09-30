@@ -741,7 +741,7 @@ function buildCounter(shop) {
   shop.metronome = group(met, [0, 0.03, 0.066]);
   mesh(box(0.008, 0.22, 0.008), m.brass, shop.metronome, [0, 0.11, 0]);
   mesh(box(0.03, 0.02, 0.012), m.brass, shop.metronome, [0, 0.16, 0]);
-  shop.box(met, [0.16, 0.26, 0.16], [0, 0.13, 0], shop.silent());
+  shop.box(met, [0.16, 0.26, 0.16], [0, 0.13, 0], shop.instrument(new THREE.Object3D(), { musical: false, wobble: 'none', metronome: true }));
 
   // A brass cash register, silent apart from the balls rattling off it.
   const reg = group(g, [3.3, 1.01, -0.1], [0, -0.35, 0]);

@@ -48,6 +48,9 @@ export const LEVEL_NAMES = ['Pulse', 'Pattern', 'Canon', 'Build-up', 'Ensemble',
 const LEVEL = {
   mallet: 0.55, xylo: 0.38, metallophone: 0.36, piano: 0.42, harpsichord: 0.4, shaker: 0.22,
   pluck: 0.5, harp: 0.45, pizz: 0.7, pop: 0.1, bounce: 0.35, thud: 0.45, crystal: 0.14,
+  // The percussion on the wall behind the counter, heard only in flight.
+  kick: 0.8, snare: 0.4, tom: 0.55, timpani: 0.6, cymbal: 0.16, hihat: 0.14, gong: 0.4,
+  triangle: 0.12, cowbell: 0.2, block: 0.4, tambourine: 0.22, chimes: 0.3, glock: 0.22, steelpan: 0.35,
 };
 // Hammond drawbars: 16', 8', 4', 2 2/3', 2' and 1 1/3', as ratios and levels.
 const DRAWBARS = [[0.5, 0.45], [1, 1], [2, 0.55], [3, 0.3], [4, 0.25], [6, 0.1]];
@@ -55,6 +58,12 @@ const DRAWBARS = [[0.5, 0.45], [1, 1], [2, 0.55], [3, 0.3], [4, 0.25], [6, 0.1]]
 // The acoustics of the shop, in the same metres as the scene.
 const SPEED_OF_SOUND = 343;
 const REF_DISTANCE = 1.5;
+// Direct sound keeps rising as a source comes closer than that, down to this distance,
+// so something struck right beside you in flight is as loud as it would be.
+const NEAR_DISTANCE = 0.3;
+// The reflections are placed by level alone, not by the HRTF. At their full physical
+// level they blur where the direct sound seems to come from, so they are held back.
+const REFLECTION_LEVEL = 0.55;
 const RT60 = 1.1;
 // The distance at which the reverb would match the direct sound. A real room this size
 // would put it near 3 m; it is pushed out so the direct sound stays a little louder
@@ -139,6 +148,7 @@ export class Music {
     this.bus.connect(breath).connect(comp);
     this.reverbIn.connect(reverb).connect(this.bus);
     this.listener = { pos: [0, 1.8, 6.7], fwd: [0, 0, -1], right: [1, 0, 0] };
+    this.sources = [];
     comp.connect(this.out);
     this.out.connect(ctx.destination);
 
@@ -198,6 +208,15 @@ export class Music {
     const right = [fwd[1] * up[2] - fwd[2] * up[1], fwd[2] * up[0] - fwd[0] * up[2], fwd[0] * up[1] - fwd[1] * up[0]];
     this.listener = { pos, fwd, right };
     if (!this.ctx) return;
+    // The organs sound on for as long as they are played, so their reflections follow
+    // the listener round the room, once they have moved enough to tell.
+    const from = this.aimedFrom, apart = (a, b) => Math.hypot(...a.map((v, i) => v - b[i]));
+    if (!from || apart(pos, from.pos) + apart(right, from.right) > 0.02) {
+      this.aimedFrom = { pos, right };
+      for (const { at, taps } of this.sources) {
+        this.aimReflections(taps, at, Math.hypot(at[0] - pos[0], at[1] - pos[1], at[2] - pos[2]), 0.05);
+      }
+    }
     const L = this.ctx.listener;
     if (L.positionX) {
       L.positionX.value = pos[0]; L.positionY.value = pos[1]; L.positionZ.value = pos[2];
@@ -313,21 +332,12 @@ export class Music {
     const air = ctx.createBiquadFilter();
     air.type = 'lowpass';
     air.frequency.value = 20000 / (1 + dist * 0.07);
-    const pan = ctx.createPanner();
-    pan.panningModel = 'HRTF';
-    pan.distanceModel = 'inverse';
-    pan.refDistance = REF_DISTANCE;
-    pan.rolloffFactor = 1;
-    if (pan.positionX) {
-      pan.positionX.value = pos[0]; pan.positionY.value = pos[1]; pan.positionZ.value = pos[2];
-    } else {
-      pan.setPosition(...pos);
-    }
-    out.connect(air).connect(pan).connect(this.bus);
+    const pan = this.panner(pos);
+    out.connect(air).connect(pan.input);
     out.connect(this.reverbIn);
-    nodes.push(air, pan);
+    nodes.push(air, ...pan.nodes);
 
-    if (this.active < 60) nodes.push(...this.reflections(out, pos, dist));
+    if (this.active < 60) for (const r of this.reflections(out, pos, dist)) nodes.push(r.delay, r.gain, r.pan);
 
     const end = this['v_' + voice](mtof(midi), t, vel, out, midi);
     this.active++;
@@ -340,23 +350,31 @@ export class Music {
   // Image sources: each surface reflects the source to a mirrored position, heard
   // later, quieter and from that direction.
   reflections(out, pos, dist) {
-    const ctx = this.ctx, { pos: lp, right } = this.listener;
-    const nodes = [];
-    for (const { axis, at, keep } of SURFACES) {
+    const ctx = this.ctx;
+    const taps = SURFACES.map(surface => {
+      const tap = { surface, delay: ctx.createDelay(0.2), gain: ctx.createGain(), pan: ctx.createStereoPanner() };
+      out.connect(tap.delay).connect(tap.gain).connect(tap.pan).connect(this.bus);
+      return tap;
+    });
+    this.aimReflections(taps, pos, dist);
+    return taps;
+  }
+
+  // Sets each reflection's delay, level and side for where the listener is now.
+  // With `glide`, they ease there instead, so a sound that holds on follows a moving
+  // listener without clicks.
+  aimReflections(taps, pos, dist, glide = 0) {
+    const { pos: lp, right } = this.listener, now = this.ctx.currentTime;
+    const set = (param, v) => glide ? param.setTargetAtTime(v, now, glide) : param.value = v;
+    for (const { surface: { axis, at, keep }, delay, gain, pan } of taps) {
       const img = [...pos];
       img[axis] = 2 * at - pos[axis];
       const d = Math.hypot(img[0] - lp[0], img[1] - lp[1], img[2] - lp[2]);
-      const delay = ctx.createDelay(0.2);
-      delay.delayTime.value = Math.min(0.2, (d - dist) / SPEED_OF_SOUND);
-      const g = ctx.createGain();
-      g.gain.value = keep * REF_DISTANCE / Math.max(d, REF_DISTANCE);
-      const sp = ctx.createStereoPanner();
+      set(delay.delayTime, clamp((d - dist) / SPEED_OF_SOUND, 0, 0.2));
+      set(gain.gain, REFLECTION_LEVEL * keep * REF_DISTANCE / Math.max(d, REF_DISTANCE));
       const side = ((img[0] - lp[0]) * right[0] + (img[1] - lp[1]) * right[1] + (img[2] - lp[2]) * right[2]) / d;
-      sp.pan.value = clamp(side, -1, 1);
-      out.connect(delay).connect(g).connect(sp).connect(this.bus);
-      nodes.push(delay, g, sp);
+      set(pan.pan, clamp(side, -1, 1));
     }
-    return nodes;
   }
 
   meter(node) {
@@ -379,23 +397,34 @@ export class Music {
     return { tonewheel: read(this.leslie.meter), pipes: read(this.church.meter), combo: read(this.comboOut.meter) };
   }
 
-  // A fixed source in the room: a panner at `at`, the late reverb and its reflections.
-  placeSource(out, at) {
+  // The direct path to the listener: an HRTF panner at `pos`, falling off inversely with
+  // distance, at the same level as before from REF_DISTANCE out and louder nearer in.
+  // The listener moves every frame and the panner follows it, direction and level.
+  panner(pos) {
     const ctx = this.ctx;
+    const near = ctx.createGain();
+    near.gain.value = REF_DISTANCE / NEAR_DISTANCE;
     const pan = ctx.createPanner();
     pan.panningModel = 'HRTF';
     pan.distanceModel = 'inverse';
-    pan.refDistance = REF_DISTANCE;
-    const [x, y, z] = at;
+    pan.refDistance = NEAR_DISTANCE;
+    pan.rolloffFactor = 1;
     if (pan.positionX) {
-      pan.positionX.value = x; pan.positionY.value = y; pan.positionZ.value = z;
+      pan.positionX.value = pos[0]; pan.positionY.value = pos[1]; pan.positionZ.value = pos[2];
     } else {
-      pan.setPosition(x, y, z);
+      pan.setPosition(...pos);
     }
-    out.connect(pan).connect(this.bus);
+    near.connect(pan).connect(this.bus);
+    return { input: near, nodes: [near, pan] };
+  }
+
+  // A fixed source in the room: a panner at `at`, the late reverb and its reflections.
+  placeSource(out, at) {
+    const [x, y, z] = at;
+    out.connect(this.panner(at).input);
     out.connect(this.reverbIn);
     const lp = this.listener.pos;
-    this.reflections(out, at, Math.hypot(x - lp[0], y - lp[1], z - lp[2]));
+    this.sources.push({ at, taps: this.reflections(out, at, Math.hypot(x - lp[0], y - lp[1], z - lp[2])) });
   }
 
   // The Leslie cabinet: the organ's highs go to a spinning horn, heard as a
@@ -927,6 +956,88 @@ export class Music {
   v_shaker(f, t, v, out) {
     this.noise(t, 0.09, out, { type: 'bandpass', freq: 5500, q: 1, amp: 1 });
     return this.noise(t + 0.07, 0.07, out, { type: 'bandpass', freq: 6000, q: 1, amp: 0.6 });
+  }
+
+  // --- the percussion wall ---
+
+  // A bass drum: a deep thump that drops in pitch as the head settles.
+  v_kick(f, t, v, out) {
+    this.noise(t, 0.03, out, { type: 'lowpass', freq: 900, amp: 0.3 * v });
+    return this.partials(55, t, [[1, 1, 0.35], [1.6, 0.3, 0.12]], out, 2.2, 0.06);
+  }
+
+  v_snare(f, t, v, out) {
+    this.noise(t, 0.16 + 0.06 * v, out, { type: 'bandpass', freq: 3200, q: 0.6, amp: 1 });
+    return this.partials(190, t, [[1, 0.6, 0.08], [1.52, 0.3, 0.06]], out, 1.3, 0.02);
+  }
+
+  // Toms, bongos and congas: a tuned head with a quick drop into pitch.
+  v_tom(f, t, v, out) {
+    this.noise(t, 0.025, out, { type: 'bandpass', freq: f * 5, q: 0.8, amp: 0.25 * v });
+    const d = clamp(0.5 * Math.sqrt(200 / f), 0.15, 0.7);
+    return this.partials(f, t, [[1, 1, d], [1.51, 0.35, d * 0.5], [2.01, 0.15, d * 0.3]], out, 1.35, 0.05);
+  }
+
+  // Kettledrums ring on, with the slightly stretched overtones of a tuned membrane.
+  v_timpani(f, t, v, out) {
+    this.noise(t, 0.05, out, { type: 'lowpass', freq: 500, amp: 0.4 * v });
+    return this.partials(f, t, [[1, 1, 2.2], [1.5, 0.5, 1.5], [1.98, 0.3, 1.1], [2.44, 0.15, 0.7]], out, 1.04, 0.08);
+  }
+
+  // Cymbals: a wash of bright noise over a cluster of clashing metal tones.
+  v_cymbal(f, t, v, out) {
+    const d = 1.2 + 1.2 * v;
+    this.noise(t, d, out, { type: 'highpass', freq: 4500, amp: 1 });
+    this.noise(t, d * 0.4, out, { type: 'bandpass', freq: 8000, q: 0.8, amp: 0.6 });
+    return this.partials(f, t, [[1, 0.2, d * 0.6], [1.41, 0.15, d * 0.5], [2.19, 0.12, d * 0.4], [3.07, 0.1, d * 0.3]], out);
+  }
+
+  v_hihat(f, t, v, out) {
+    return this.noise(t, 0.05 + 0.04 * v, out, { type: 'highpass', freq: 7500, amp: 1 });
+  }
+
+  // A tam-tam: slow to bloom and very long, its overtones far from harmonic.
+  v_gong(f, t, v, out) {
+    this.noise(t, 2.5, out, { type: 'bandpass', freq: 1800, q: 0.5, amp: 0.12, attack: 0.3 });
+    return this.partials(f, t, [
+      [1, 1, 6, 0.04], [1.52, 0.6, 5, 0.12], [2.11, 0.45, 4, 0.2], [2.77, 0.35, 3.2, 0.3], [3.4, 0.25, 2.6, 0.4], [4.33, 0.15, 2, 0.5],
+    ], out);
+  }
+
+  v_triangle(f, t, v, out) {
+    return this.partials(f, t, [[1, 1, 2.4], [2.76, 0.45, 1.8], [5.4, 0.3, 1.2], [8.93, 0.2, 0.8]], out);
+  }
+
+  v_cowbell(f, t, v, out) {
+    this.noise(t, 0.01, out, { type: 'bandpass', freq: 3000, q: 1, amp: 0.3 });
+    return this.partials(f, t, [[1, 1, 0.3], [1.48, 0.7, 0.22], [2.9, 0.2, 0.1]], out);
+  }
+
+  // Wood and temple blocks: a hollow knock with a short, pitched ring.
+  v_block(f, t, v, out) {
+    this.noise(t, 0.012, out, { type: 'bandpass', freq: f * 3, q: 2, amp: 0.4 });
+    return this.partials(f, t, [[1, 1, 0.1], [2.7, 0.3, 0.04]], out);
+  }
+
+  v_tambourine(f, t, v, out) {
+    this.partials(170, t, [[1, 0.3, 0.07]], out);
+    this.noise(t, 0.22, out, { type: 'bandpass', freq: 7000, q: 1.2, amp: 1 });
+    return this.noise(t + 0.05, 0.18, out, { type: 'bandpass', freq: 9000, q: 1.2, amp: 0.5 });
+  }
+
+  // Tubular bells: the strike tone and its stretched partials ringing a long time.
+  v_chimes(f, t, v, out) {
+    this.noise(t, 0.01, out, { type: 'bandpass', freq: 4000, q: 1, amp: 0.2 });
+    return this.partials(f, t, [[1, 1, 4.5], [2.0, 0.35, 3], [3.01, 0.3, 2.2], [4.16, 0.2, 1.5], [5.43, 0.1, 1]], out);
+  }
+
+  v_glock(f, t, v, out) {
+    return this.partials(f, t, [[1, 1, 1.6], [2.71, 0.25 + 0.2 * v, 0.4], [5.1, 0.1 * v, 0.15]], out);
+  }
+
+  // A steel pan: a soft attack that blooms into its octave and fifth above.
+  v_steelpan(f, t, v, out) {
+    return this.partials(f, t, [[1, 1, 1.3, 0.01], [2, 0.6, 0.9, 0.02], [3, 0.3, 0.5, 0.02], [4.02, 0.1, 0.3]], out);
   }
 
   // The launcher's soft cork pop.

@@ -12,6 +12,7 @@ import { Shop, buildShop } from './shop.js';
 import { buildDecor, SUN_DIR } from './decor.js';
 import { buildPercussion } from './percussion.js';
 import { buildOrgan } from './organ.js';
+import { buildDrums } from './drums.js';
 import { Targets } from './targets.js';
 import { Effects } from './effects.js';
 import { Autoplay } from './autoplay.js';
@@ -160,6 +161,7 @@ const { chair } = buildShop(shop);
 buildPercussion(shop, chair);
 buildOrgan(shop);
 const decor = buildDecor(shop);
+buildDrums(shop);
 shop.finalize();
 Math.random = random;
 // Only the instruments that swing, bob or rock, the metronome and the Leslie's rotors move.
@@ -274,6 +276,31 @@ const bandGuns = {};
   }
 }
 
+// --- flight --------------------------------------------------------------------------------
+
+// Strike the metronome ten times running and you take off with your right gun, fly
+// round the shop for a minute, and settle back where you stood. The path keeps above
+// the instruments and below the lamps, clear of the mezzanine and the pipe organ, and
+// turns twice towards the percussion wall behind the counter.
+const FLIGHT = { taps: 10, gap: 1500, time: 60, ramp: 5, turn: 0.8 };
+const FLIGHT_PATH = new THREE.CatmullRomCurve3([
+  [0, 1.85, 6.7], [0, 2.5, 5.4], [-2.5, 3.2, 3.6], [-6.5, 3.0, 1.0], [-6.8, 3.4, -3.8],
+  [-2.5, 3.0, -5.2], [2.5, 2.6, -4.6], [5.8, 3.0, -1.2], [6.2, 2.5, 3.2], [5.5, 3.0, 5.8],
+  [2.0, 2.4, 4.2], [-1.8, 2.8, 0.6], [-5.2, 3.4, -2.0], [-0.5, 3.6, -3.4], [4.5, 3.2, -0.5],
+  [0.5, 3.3, 2.2], [-3.5, 3.4, 5.0], [-7.0, 3.5, 6.2], [-7.6, 3.0, 3.6], [-4.2, 2.6, 4.6],
+  [-1.8, 2.3, 6.9], [0, 1.85, 6.7],
+].map(p => new THREE.Vector3(...p)), false, 'centripetal');
+FLIGHT_PATH.arcLengthDivisions = 1000;
+const FLIGHT_LENGTH = FLIGHT_PATH.getLength();
+// In flight the view leans towards the middle of the ensemble as well as the way ahead,
+// less so near the percussion wall, so it can be seen as the path turns towards it.
+const ROOM_CENTRE = new THREE.Vector3(0, 1.2, -1);
+// Where the left gun waits on the counter meanwhile, and where it points.
+const PARKED = new THREE.Vector3(-0.45, 1.09, 5.45);
+const PARKED_AIM = new THREE.Vector3(-1.6, 1.09, 1.0);
+const flight = { t: null, taps: 0, lastTap: 0, bank: 0, q: new THREE.Quaternion() };
+const smoothstep = x => x * x * (3 - 2 * x);
+
 // --- balls -------------------------------------------------------------------------------
 
 const BALL_COLORS = [0xff4d6d, 0xffb703, 0x3a86ff, 0x8ac926, 0xff7b00, 0xc77dff, 0x00c2a8, 0xf15bb5];
@@ -356,6 +383,8 @@ function handleCollision({ ball, other, impact, point }) {
     return;
   }
   const inst = other.inst;
+  if (inst?.metronome) tapMetronome(ball);
+  if (inst?.flightOnly && flight.t === null) return;
   if (!inst || !inst.voice) return;
   if (inst.thud) {
     music.effect('thud', 36, vel, point.toArray());
@@ -627,6 +656,7 @@ function stopAuto() {
   rand = Math.random;
   targets.rand = Math.random;
   targets.allow = null;
+  land();
   autoIo.hold(null);
   autoIo.duet(null);
   firing = false;
@@ -644,11 +674,67 @@ function goHome() {
   if (game.state !== 'playing') return;
   game.state = 'menu';
   firing = false;
+  land();
   unpin();
   for (const b of balls) b.dying = true;
   targets.reset();
   $('hud').classList.add('hidden');
   $('overlay').classList.remove('hidden');
+}
+
+// Each ball counts once, and a pause of more than a moment starts the count again.
+function tapMetronome(ball) {
+  if (ball.tapped || flight.t !== null || (game.state !== 'playing' && game.state !== 'auto')) return;
+  ball.tapped = true;
+  const now = performance.now();
+  flight.taps = now - flight.lastTap < FLIGHT.gap ? flight.taps + 1 : 1;
+  flight.lastTap = now;
+  if (flight.taps < FLIGHT.taps) return;
+  flight.taps = 0;
+  flight.t = 0;
+  flight.bank = 0;
+  flight.q.copy(camera.quaternion);
+  // The left gun stays behind, set down on the counter.
+  scene.add(phaser);
+  showHint('Up you go · the left gun waits on the counter', 4000);
+}
+
+function land() {
+  if (flight.t === null) return;
+  flight.t = null;
+  camera.position.copy(CAMERA_POS);
+  camera.add(phaser);
+}
+
+// Moves the camera along the flight path. It speeds up and slows down gently at either
+// end, and turns from the resting view to its own and back, so it leaves and lands
+// where it stood. In flight the pointer looks further round than it does at rest.
+const flyAhead = new THREE.Vector3(), flyCentre = new THREE.Vector3(), flyMatrix = new THREE.Matrix4();
+const flyAim = new THREE.Quaternion(), flyRoll = new THREE.Quaternion(), flyTarget = new THREE.Quaternion();
+const flyUp = new THREE.Vector3(0, 1, 0), flyAxis = new THREE.Vector3(0, 0, 1), flyEuler = new THREE.Euler(0, 0, 0, 'YXZ');
+function fly(dt) {
+  flight.t += dt;
+  const T = FLIGHT.time, r = FLIGHT.ramp, t = Math.min(flight.t, T), v = 1 / (T - r);
+  const s = t < r ? v * t * t / (2 * r) : t > T - r ? 1 - v * (T - t) ** 2 / (2 * r) : v * (t - r / 2);
+  const rest = camera.quaternion.clone();
+  FLIGHT_PATH.getPointAt(s, camera.position);
+  const heading = u => { const d = FLIGHT_PATH.getTangentAt(clamp(u, 0, 1)); return Math.atan2(-d.x, -d.z); };
+  const ds = 1 / FLIGHT_LENGTH;
+  let turn = heading(s + ds) - heading(s);
+  turn -= 2 * Math.PI * Math.round(turn / (2 * Math.PI));
+  flight.bank += (clamp(turn * FLIGHT.turn * FLIGHT_LENGTH * v, -0.4, 0.4) - flight.bank) * Math.min(1, dt * 2);
+  FLIGHT_PATH.getPointAt(Math.min(1, s + 1.5 * ds), flyAhead).sub(camera.position);
+  if (flyAhead.lengthSq() > 1e-4) flyAhead.normalize();
+  flyCentre.copy(ROOM_CENTRE).sub(camera.position).normalize().multiplyScalar(0.6 * clamp((6.5 - camera.position.z) / 3, 0, 1));
+  flyMatrix.lookAt(camera.position, flyAhead.add(flyCentre).add(camera.position), flyUp);
+  flyTarget.setFromRotationMatrix(flyMatrix)
+    .multiply(flyAim.setFromEuler(flyEuler.set(pointer.y * 0.35, -pointer.x * 0.9, 0)))
+    .multiply(flyRoll.setFromAxisAngle(flyAxis, flight.bank));
+  flight.q.slerp(flyTarget, Math.min(1, dt * 2.5));
+  const w = smoothstep(clamp(Math.min(t / 4, (T - t) / r), 0, 1));
+  camera.quaternion.copy(rest).slerp(flight.q, w);
+  camera.updateMatrixWorld();
+  if (flight.t >= T) land();
 }
 
 // Runs the physics up to the audio clock in fixed steps, playing the score on each pulse.
@@ -845,7 +931,7 @@ canvas.addEventListener('pointerdown', e => {
     const p = aimPoint(new THREE.Vector2(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1));
     if (pin.at && p.distanceTo(pin.at) < 0.6) {
       unpin();
-    } else {
+    } else if (flight.t === null) {
       setPin(p, (music.ctx.currentTime - music.t0) / PULSE);
     }
     return;
@@ -960,6 +1046,7 @@ resize();
 
 const meterSegs = [...document.querySelectorAll('#meter i')];
 let last = performance.now(), clock = 0, demoTimer = 1;
+const look = new THREE.Euler(0, 0, 0, 'YXZ');
 const aimTarget = new THREE.Vector3();
 const camFwd = new THREE.Vector3(), camUp = new THREE.Vector3();
 
@@ -992,8 +1079,10 @@ function frame(now) {
     yaw = -pointer.x * 0.2;
     pitch = pointer.y * 0.12 - 0.06 + tiltUp;
   }
-  camera.rotation.y += (yaw - camera.rotation.y) * Math.min(1, dt * 4);
-  camera.rotation.x += (pitch - camera.rotation.x) * Math.min(1, dt * 4);
+  look.y += (yaw - look.y) * Math.min(1, dt * 4);
+  look.x += (pitch - look.x) * Math.min(1, dt * 4);
+  camera.quaternion.setFromEuler(look);
+  if (flight.t !== null) fly(dt);
 
   if (game.state === 'playing') {
     // Shots go out on the shop's pulse, never between.
@@ -1021,9 +1110,16 @@ function frame(now) {
   }
   launcher.lookAt(aimTarget);
   launcher.rotateY(Math.PI);
-  // Unpinned, the left gun rests pointing ahead and a little outwards.
-  phaser.position.copy(PHASER_REST);
-  phaser.lookAt(pin.at ?? camera.localToWorld(tmp.set(-1.5, -0.5, -8)));
+  // Unpinned, the left gun rests pointing ahead and a little outwards. In flight it is
+  // set down on the counter as you leave and picked up again as you land.
+  if (flight.t === null) {
+    phaser.position.copy(PHASER_REST);
+    phaser.lookAt(pin.at ?? camera.localToWorld(tmp.set(-1.5, -0.5, -8)));
+  } else {
+    const k = smoothstep(clamp(Math.min(flight.t, FLIGHT.time - flight.t) / 1.2, 0, 1));
+    phaser.position.lerpVectors(camera.localToWorld(tmp.copy(PHASER_REST)), PARKED, k);
+    phaser.lookAt(pin.at ?? camera.localToWorld(tmp.set(-1.5, -0.5, -8)).lerp(PARKED_AIM, k));
+  }
   phaser.rotateY(Math.PI);
   phaser.translateZ(0.1 * pin.kick);
   pin.kick *= Math.exp(-dt * 12);
