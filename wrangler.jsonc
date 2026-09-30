@@ -1,0 +1,9 @@
+// Cloudflare Worker that serves the game as static files, so it can also be served from
+// ianbtw.com/18-bouncy-balls/. GitHub Pages keeps serving it from this repo too.
+{
+  "name": "18-bouncy-balls",
+  "compatibility_date": "2026-09-26",
+  "assets": {
+    "directory": "."
+  }
+}

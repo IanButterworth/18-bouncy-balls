@@ -1,10 +1,10 @@
 # Music for 18 Bouncy Balls
 
-[![Music for 18 Bouncy Balls](og-image.jpg)](https://ianbutterworth.github.io/18-bouncy-balls/)
+[![Music for 18 Bouncy Balls](og-image.jpg)](https://ianbtw.com/18-bouncy-balls/)
 
 You're Steve Reich, you're in a vintage Paris music instrument shop, and you have a bouncy ball gun, or two.
 
-<https://ianbutterworth.github.io/18-bouncy-balls/>
+<https://ianbtw.com/18-bouncy-balls/>
 
 Listen to the original: [Music for 18 Musicians on Spotify](https://open.spotify.com/album/1htaihWHjMXZTupJanFnfC)
 

@@ -1,0 +1,10 @@
+# Only the site files are served; keep repo files out.
+.git
+.gitignore
+.gitattributes
+.nojekyll
+.assetsignore
+wrangler.jsonc
+README.md
+node_modules
+.wrangler
