@@ -279,10 +279,10 @@ const bandGuns = {};
 // --- flight --------------------------------------------------------------------------------
 
 // Strike the metronome ten times running and you take off with your right gun, fly
-// round the shop for a minute, and settle back where you stood. The path keeps above
+// round the shop for over a minute, and settle back where you stood. The path keeps above
 // the instruments and below the lamps, clear of the mezzanine and the pipe organ, and
 // turns twice towards the percussion wall behind the counter.
-const FLIGHT = { taps: 10, gap: 1500, time: 60, ramp: 5, turn: 0.8 };
+const FLIGHT = { taps: 10, gap: 1500, time: 80, ramp: 6, turn: 0.8 };
 const FLIGHT_PATH = new THREE.CatmullRomCurve3([
   [0, 1.85, 6.7], [0, 2.5, 5.4], [-2.5, 3.2, 3.6], [-6.5, 3.0, 1.0], [-6.8, 3.4, -3.8],
   [-2.5, 3.0, -5.2], [2.5, 2.6, -4.6], [5.8, 3.0, -1.2], [6.2, 2.5, 3.2], [5.5, 3.0, 5.8],
@@ -722,16 +722,16 @@ function fly(dt) {
   const ds = 1 / FLIGHT_LENGTH;
   let turn = heading(s + ds) - heading(s);
   turn -= 2 * Math.PI * Math.round(turn / (2 * Math.PI));
-  flight.bank += (clamp(turn * FLIGHT.turn * FLIGHT_LENGTH * v, -0.4, 0.4) - flight.bank) * Math.min(1, dt * 2);
-  FLIGHT_PATH.getPointAt(Math.min(1, s + 1.5 * ds), flyAhead).sub(camera.position);
+  flight.bank += (clamp(turn * FLIGHT.turn * FLIGHT_LENGTH * v, -0.4, 0.4) - flight.bank) * Math.min(1, dt * 1.2);
+  FLIGHT_PATH.getPointAt(Math.min(1, s + 3 * ds), flyAhead).sub(camera.position);
   if (flyAhead.lengthSq() > 1e-4) flyAhead.normalize();
   flyCentre.copy(ROOM_CENTRE).sub(camera.position).normalize().multiplyScalar(0.6 * clamp((6.5 - camera.position.z) / 3, 0, 1));
   flyMatrix.lookAt(camera.position, flyAhead.add(flyCentre).add(camera.position), flyUp);
   flyTarget.setFromRotationMatrix(flyMatrix)
     .multiply(flyAim.setFromEuler(flyEuler.set(pointer.y * 0.35, -pointer.x * 0.9, 0)))
     .multiply(flyRoll.setFromAxisAngle(flyAxis, flight.bank));
-  flight.q.slerp(flyTarget, Math.min(1, dt * 2.5));
-  const w = smoothstep(clamp(Math.min(t / 4, (T - t) / r), 0, 1));
+  flight.q.slerp(flyTarget, Math.min(1, dt * 1.4));
+  const w = smoothstep(clamp(Math.min(t / 5, (T - t) / r), 0, 1));
   camera.quaternion.copy(rest).slerp(flight.q, w);
   camera.updateMatrixWorld();
   if (flight.t >= T) land();
